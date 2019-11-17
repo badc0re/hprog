@@ -3,23 +3,24 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"github.com/antlr/antlr4/runtime/Go/antlr"
+	"hprog/hcore"
 	"os"
 )
-
-func add_history() {
-
-}
 
 func readline(idet string, scanner *bufio.Scanner) bool {
 	fmt.Print(idet)
 	return scanner.Scan()
 }
 
+type blaListener struct {
+	*HCore.BaseHCoreListener
+}
+
 func main() {
-	var buffer []byte
 	const idet = "hprog> "
 
-	fmt.Println("Hprog Version 0.0.0.0.0.0.1")
+	fmt.Println("Hprog Version 0.0.0.0.0.0.2")
 	fmt.Println("One way to escape, ctr-c to exit.")
 
 	scanner := bufio.NewScanner(os.Stdin)
@@ -28,14 +29,18 @@ func main() {
 		return bufio.ScanLines(data, atEOF)
 	}
 
-	//buffer := make([]byte, 12)
-	//scanner.Buffer(buffer, bufio.MaxScanTokenSize /* 65536 */)
 	scanner.Split(onNewLine)
 	for {
 		for readline(idet, scanner) {
-			var _bline = scanner.Bytes()
-			buffer = append(buffer, _bline...)
-			fmt.Println(buffer)
+			var _bline = scanner.Text()
+			is := antlr.NewInputStream(_bline)
+			lexer := HCore.NewHCoreLexer(is)
+			stream := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
+			p := HCore.NewHCoreParser(stream)
+			antlr.ParseTreeWalkerDefault.Walk(&blaListener{}, p.Start())
+			// add history
+			//buffer = append(buffer, _bline)
+			//fmt.Println(buffer)
 		}
 	}
 

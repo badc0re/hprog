@@ -28,6 +28,7 @@ const (
 	COMMA
 	DOT
 	MINUS
+	SEMICOLON
 
 	GREATER
 	GREATER_EQUAL
@@ -118,7 +119,9 @@ func (scanner *Scanner) unread() {
 // stet function that returns a state function
 type stateFunc func(*lexer) stateFunc
 
-type item struct{}
+type item struct {
+	token Token
+}
 
 type lexer struct {
 	scanner *Scanner
@@ -147,15 +150,29 @@ func fullScan(lex *lexer) stateFunc {
 		case ')':
 			fmt.Println("is CB!!!")
 			lex.emit(CB)
+		case ';':
+			fmt.Println("is CB!!!")
+			lex.emit(SEMICOLON)
+		case '+':
+			fmt.Println("is CB!!!")
+			lex.emit(PLUS)
+		case '-':
+			fmt.Println("is CB!!!")
+			lex.emit(MINUS)
+		case '*':
+			fmt.Println("is CB!!!")
+			lex.emit(STAR)
 		default:
 			if isAlpha(ch) {
-				fmt.Println("is alpha!!!")
+				//fmt.Println("is alpha!!!")
+				lex.emit(IDENTIFIER)
 			}
 			if isDigit(ch) {
-				fmt.Println("is digit!!!")
+				//fmt.Println("is digit!!!")
+				lex.emit(NUMBER)
 			}
 			if ch == eof {
-				fmt.Println("it is the end!!!")
+				//fmt.Println("it is the end!!!")
 				lex.emit(EOF)
 			}
 		}
@@ -163,8 +180,12 @@ func fullScan(lex *lexer) stateFunc {
 	return nil
 }
 
-func (lex *lexer) emit(t Token) {
-	lex.items <- item{}
+func (lex *lexer) emit(token Token) {
+	lex.items <- item{token: token}
+}
+
+func (lex *lexer) nextToken() item {
+	return <-lex.items
 }
 
 func (lex *lexer) run() {
@@ -176,8 +197,8 @@ func (lex *lexer) run() {
 	close(lex.items)
 }
 
-func startGrinding(input string) {
-	lex := &lexer{
+func startGrinding(input string) (lex *lexer) {
+	lex = &lexer{
 		scanner: &Scanner{
 			reader: &Reader{
 				runeReader: strings.NewReader(input),
@@ -186,7 +207,7 @@ func startGrinding(input string) {
 		items: make(chan item),
 	}
 	go lex.run()
-	lex = nil
+	return lex
 }
 
 func readline(idet string, scanner *bufio.Scanner) bool {
@@ -229,7 +250,17 @@ func main() {
 		for readline(idet, scanner) {
 			var sline = scanner.Text()
 			if len(sline) > 0 {
-				startGrinding(sline)
+				lex := startGrinding(sline)
+				count := 0
+				for {
+					bla := lex.nextToken()
+					count++
+					if bla.token == EOF {
+						break
+					}
+					fmt.Println(bla.token)
+				}
+
 				buffer = append(buffer, sline)
 			}
 		}

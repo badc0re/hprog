@@ -18,11 +18,17 @@ start : expression* EOF;
 
 
 operator :
-   (MUL | DIV | ADD | SUB)
+(
+ MUL 
+ | DIV 
+ | ADD 
+ | SUB
+ ) # Op
    ;
 
 expression 
    : 
-   NUMBER | (OP operator expression+ CP)
+   (OP operator expression+ CP) # Operation
+   | NUMBER # Number
    ;
    

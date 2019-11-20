@@ -10,16 +10,16 @@ import (
 	"unicode"
 )
 
-type Token int
+type TokenType int
 type Pos int
 type Line int
 
 const (
-	ILLEGAL Token = iota
+	ILLEGAL TokenType = iota
 
 	// single char tokens
-	OB
-	CB
+	OP
+	CP
 	LB
 	RB
 	PLUS
@@ -32,8 +32,8 @@ const (
 
 	GREATER
 	GREATER_EQUAL
-	BANG
-	BANG_EQUAL
+	EXCL
+	EXCL_EQUAL
 	LESS
 	LESS_EQUAL
 	EQUAL
@@ -83,11 +83,12 @@ func isAlphaNumeric(ch rune) bool {
 }
 
 type Reader struct {
-	runeReader io.RuneScanner
-	eof        bool
-	start      Pos
-	current    Pos
-	line       Line
+	runeReader      io.RuneScanner
+	eof             bool
+	currentPosition Pos
+	// not used stuff is commented
+	//startPosition   Pos
+	//line            Line
 }
 
 type Scanner struct {
@@ -96,14 +97,14 @@ type Scanner struct {
 
 func (reader *Reader) read() (ch rune) {
 	ch, _, _ = reader.runeReader.ReadRune()
-	reader.current++
+	reader.currentPosition++
 	return ch
 }
 
 func (reader *Reader) unread() {
 	// maybe err
 	reader.runeReader.UnreadRune()
-	reader.current--
+	reader.currentPosition--
 }
 
 func (scanner *Scanner) scan() (ch rune) {
@@ -112,23 +113,47 @@ func (scanner *Scanner) scan() (ch rune) {
 	return scanner.reader.read()
 }
 
+func (scanner *Scanner) futureMatch(fch rune) bool {
+	ch := scanner.scan()
+	if ch == eof {
+		// end of the road
+		fmt.Println("unformatted error!")
+		return false
+	} else if ch == fch {
+		return true
+	}
+	return false
+}
+
+func (scanner *Scanner) peek() (ch rune) {
+	ch = scanner.scan()
+	scanner.unread()
+	return ch
+}
+
 func (scanner *Scanner) unread() {
 	scanner.reader.unread()
 }
 
 // stet function that returns a state function
-type stateFunc func(*lexer) stateFunc
+type stateFunc func(*Lexer) stateFunc
 
-type item struct {
-	token Token
+type Token struct {
+	tokenType TokenType
+
+	start Pos
+	end   Pos
+	line  Line
+	// optional based on the tokeType
+	content string
 }
 
-type lexer struct {
+type Lexer struct {
 	scanner *Scanner
-	items   chan item // channel of detected items
+	tokens  chan Token // channel of detected tokens
 }
 
-func (lex *lexer) trimWhitespace() {
+func (lex *Lexer) trimWhitespace() {
 	for {
 		ch := lex.scanner.scan()
 		if !isWhitespace(ch) {
@@ -138,30 +163,62 @@ func (lex *lexer) trimWhitespace() {
 	}
 }
 
-func fullScan(lex *lexer) stateFunc {
+func fullScan(lex *Lexer) stateFunc {
 	for {
 		switch ch := lex.scanner.scan(); ch {
 		case ' ':
-			fmt.Println("is WS!!!")
 			lex.trimWhitespace()
 		case '(':
-			fmt.Println("is OB!!!")
-			lex.emit(OB)
+			lex.emit(OP)
 		case ')':
-			fmt.Println("is CB!!!")
-			lex.emit(CB)
-		case ';':
-			fmt.Println("is CB!!!")
-			lex.emit(SEMICOLON)
+			lex.emit(CP)
+		case '{':
+			lex.emit(LB)
+		case '}':
+			lex.emit(RB)
 		case '+':
-			fmt.Println("is CB!!!")
 			lex.emit(PLUS)
 		case '-':
-			fmt.Println("is CB!!!")
 			lex.emit(MINUS)
 		case '*':
-			fmt.Println("is CB!!!")
 			lex.emit(STAR)
+		case ';':
+			lex.emit(SEMICOLON)
+		case ',':
+			lex.emit(DOT)
+		case '.':
+			lex.emit(DOT)
+		// special cases
+		case '!':
+			if lex.scanner.futureMatch('=') {
+				// TODO: need to handle a case wher it is not matched
+				lex.emit(EXCL_EQUAL)
+			} else {
+				lex.emit(EXCL)
+			}
+			// TODO: case when it is used as NOT
+			// lex.emit(NOT)
+			//lex.emit(ERROR)
+		case '=':
+			if lex.scanner.futureMatch('=') {
+				lex.emit(EQUAL_EQUAL)
+			} else {
+				lex.emit(EQUAL)
+			}
+			//lex.emit(ERROR)
+		case '<':
+			if lex.scanner.futureMatch('=') {
+				lex.emit(LESS_EQUAL)
+			} else {
+				lex.emit(LESS)
+			}
+		case '>':
+			if lex.scanner.futureMatch('=') {
+				lex.emit(GREATER_EQUAL)
+			} else {
+				lex.emit(GREATER)
+			}
+			//lex.emit(ERROR)
 		default:
 			if isAlpha(ch) {
 				//fmt.Println("is alpha!!!")
@@ -180,31 +237,32 @@ func fullScan(lex *lexer) stateFunc {
 	return nil
 }
 
-func (lex *lexer) emit(token Token) {
-	lex.items <- item{token: token}
+func (lex *Lexer) emit(tokenType TokenType) {
+	// need more info
+	lex.tokens <- Token{tokenType: tokenType}
 }
 
-func (lex *lexer) nextToken() item {
-	return <-lex.items
+func (lex *Lexer) nextToken() Token {
+	return <-lex.tokens
 }
 
-func (lex *lexer) run() {
+func (lex *Lexer) run() {
 	// sourceText is already lex function that returns 'stateFunc'
 	for state := fullScan; state != nil; {
 		// asign state and wait for new state
 		state = state(lex)
 	}
-	close(lex.items)
+	close(lex.tokens)
 }
 
-func startGrinding(input string) (lex *lexer) {
-	lex = &lexer{
+func startGrinding(input string) (lex *Lexer) {
+	lex = &Lexer{
 		scanner: &Scanner{
 			reader: &Reader{
 				runeReader: strings.NewReader(input),
 			},
 		},
-		items: make(chan item),
+		tokens: make(chan Token),
 	}
 	go lex.run()
 	return lex
@@ -251,14 +309,12 @@ func main() {
 			var sline = scanner.Text()
 			if len(sline) > 0 {
 				lex := startGrinding(sline)
-				count := 0
 				for {
 					bla := lex.nextToken()
-					count++
-					if bla.token == EOF {
+					fmt.Println("token:", bla.tokenType)
+					if bla.tokenType == EOF {
 						break
 					}
-					fmt.Println(bla.token)
 				}
 
 				buffer = append(buffer, sline)

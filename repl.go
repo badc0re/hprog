@@ -233,12 +233,13 @@ func (lex *Lexer) extractString() bool {
 	}
 }
 
-func (lex *Lexer) extractNumber() bool {
-	lex.scanner.start = lex.scanner.pos
+func (lex *Lexer) extractNumber(ch rune) bool {
+	lex.scanner.buf.WriteRune(ch)
+	lex.scanner.start = lex.scanner.pos - 1
+
 	foundPoint := false
 	for {
 		ch := lex.scanner.read()
-		fmt.Println(string(ch))
 		if isDigit(ch) {
 			lex.scanner.buf.WriteRune(ch)
 		} else if ch == '.' {
@@ -259,10 +260,11 @@ func (lex *Lexer) extractNumber() bool {
 	}
 }
 
-func (lex *Lexer) extractIdentifier() bool {
+func (lex *Lexer) extractIdentifier(ch rune) bool {
 	lex.scanner.start = lex.scanner.pos
+	lex.scanner.buf.WriteRune(ch)
 	for {
-		ch := lex.scanner.read()
+		ch = lex.scanner.read()
 		if isAlphaNumeric(ch) {
 			lex.scanner.buf.WriteRune(ch)
 		} else if ch == eof {
@@ -359,17 +361,16 @@ func fullScan(lex *Lexer) stateFunc {
 			}
 		default:
 			if isAlpha(ch) {
-				if lex.extractIdentifier() {
+				if lex.extractIdentifier(ch) {
 					lex.emit(IDENTIFIER)
 				} else {
-					fmt.Println("number ups")
+					fmt.Println("identifier ups")
 				}
 			}
 			if isDigit(ch) {
 				// we detected the number, now we need to go back
 				// from the start to process the whole thing
-				lex.scanner.unread()
-				if lex.extractNumber() {
+				if lex.extractNumber(ch) {
 					lex.emit(NUMBER)
 				} else {
 					fmt.Println("number ups")
@@ -397,10 +398,15 @@ func (lex *Lexer) emit(tType TokenType) {
 		end   Pos
 		line  Line
 	*/
+	value := lex.scanner.buf.String()
+	tokenType, found := keys[value]
+	if found {
+		tType = tokenType
+	}
 	lex.tokens <- Token{
 		tokenType: tType,
 		pos:       lex.scanner.start,
-		value:     lex.scanner.buf.String(),
+		value:     value,
 	}
 	lex.scanner.buf.Reset()
 	lex.scanner.start = lex.scanner.pos

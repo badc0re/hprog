@@ -30,6 +30,7 @@ const (
 	DOT
 	MINUS
 	SEMICOLON
+	QUOTE
 
 	GREATER
 	GREATER_EQUAL
@@ -62,9 +63,54 @@ const (
 )
 
 var keys = map[string]TokenType{
+	// single char tokens
+	"(":  OP,
+	")":  CP,
+	"{":  LB,
+	"}":  RB,
+	"+":  PLUS,
+	"/":  SLASH,
+	"*":  STAR,
+	",":  COMMA,
+	".":  DOT,
+	"-":  MINUS,
+	";":  SEMICOLON,
+	"\"": QUOTE,
+
+	">":  GREATER,
+	">=": GREATER_EQUAL,
+	"!":  EXCL,
+	"!=": EXCL_EQUAL,
+	"<":  LESS,
+	"<=": LESS_EQUAL,
+	"=":  EQUAL,
+	"==": EQUAL_EQUAL,
+
+	// Keywords
 	"if":   IF,
 	"else": ELSE,
+
 	"args": ARGS,
+
+	"and": AND,
+	"or":  OR,
+
+	"false": FALSE,
+	"true":  TRUE,
+
+	// reserver for dbg
+	"<STRING>": STRING,
+	"<NUMBER>": NUMBER,
+}
+
+var reverseKey = reverseMap(keys)
+
+func reverseMap(m map[string]TokenType) map[TokenType]string {
+	n := make(map[TokenType]string)
+	for k, v := range m {
+		n[v] = k
+	}
+	return n
 }
 
 var eof = rune(0)
@@ -131,9 +177,11 @@ func (scanner *Scanner) reportError() {
 
 }
 
-func (scanner *Scanner) peek() (ch rune) {
+func (scanner *Scanner) peekRune() (ch rune) {
 	ch = scanner.read()
-	scanner.unread()
+	if ch != eof {
+		scanner.unread()
+	}
 	return ch
 }
 
@@ -166,16 +214,19 @@ func (lex *Lexer) extractString() bool {
 	lex.scanner.start = lex.scanner.pos
 	for {
 		ch := lex.scanner.read()
-		if ch == '"' {
-			return true
-		}
-
-		if ch == eof {
+		if ch == '\n' {
+			lex.scanner.line++
+		} else if ch == eof {
 			fmt.Println("ups")
 			lex.scanner.buf.Reset()
 			return false
+		} else if ch == '"' {
+			// TODO: can decide if we want to check the next
+			// if it something wrong there
+			//next := lex.scanner.peek()
+			return true
+		} else {
 		}
-
 		lex.scanner.buf.WriteRune(ch)
 	}
 }
@@ -354,9 +405,12 @@ func main() {
 			if len(sline) > 0 {
 				lex := startGrinding(sline)
 				for {
-					bla := lex.nextToken()
-					fmt.Println("token:", bla.value)
-					if bla.tokenType == EOF {
+					token := lex.nextToken()
+					humanToken, found := reverseKey[token.tokenType]
+					if found == true {
+						fmt.Println(humanToken)
+					}
+					if token.tokenType == EOF {
 						break
 					}
 				}

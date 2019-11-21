@@ -91,6 +91,7 @@ var keys = map[string]TokenType{
 	"==": EQUAL_EQUAL,
 
 	// Keywords
+	"_":       PLACEHOLDER,
 	"if":      IF,
 	"else":    ELSE,
 	"define":  DEFINE,
@@ -105,13 +106,13 @@ var keys = map[string]TokenType{
 	"true":  TRUE,
 
 	// reserver for dbg
-	"<STRING>":     STRING,
-	"<IDENTIFIER>": IDENTIFIER,
-	"<NUMBER>":     NUMBER,
-	"\\0":          EOF,
+	//	"<STRING>":     STRING,
+	//	"<IDENTIFIER>": IDENTIFIER,
+	//	"<NUMBER>":     NUMBER,
+	"\\0": EOF,
 }
 
-var reverseKey = reverseMap(keys)
+var reverseKeys = reverseMap(keys)
 
 func reverseMap(m map[string]TokenType) map[TokenType]string {
 	n := make(map[TokenType]string)
@@ -124,13 +125,8 @@ func reverseMap(m map[string]TokenType) map[TokenType]string {
 var eof = rune(0)
 
 func wannaPrint(token Token) {
-	humanToken, found := reverseKey[token.tokenType]
-	printFormat := "type: %d, value: %s, start: %d, end: %d, line:%d, human:%s\n"
-	if found == true {
-		fmt.Printf(printFormat, token.tokenType, token.value, token.pos, token.end, token.line, humanToken)
-	} else {
-		fmt.Println(printFormat, token.tokenType, token.pos, token.end, token.line, token.value, token)
-	}
+	printFormat := "type: %d, value: %s, start: %d, end: %d, line:%d\n"
+	fmt.Printf(printFormat, token.tokenType, token.value, token.pos, token.end, token.line)
 }
 
 func isWhitespace(ch rune) bool { return ch == ' ' || ch == '\t' || ch == '\r' }
@@ -204,15 +200,15 @@ func (scanner *Scanner) peek() (ch rune) {
 }
 
 func (scanner *Scanner) futureMatch(fch rune) bool {
-	ch := scanner.read()
+	ch := scanner.peek()
 	if ch == eof {
 		// end of the road
 		fmt.Println("unformatted error!")
 		return false
 	} else if ch == fch {
+		scanner.read()
 		return true
 	}
-	scanner.unread()
 	return false
 }
 
@@ -230,22 +226,29 @@ func (lex *Lexer) trimWhitespace() {
 	}
 }
 
+func (lex *Lexer) trimComment() {
+	for {
+		ch := lex.scanner.read()
+		if ch == eof {
+			break
+		}
+	}
+}
+
 func (lex *Lexer) extractString() bool {
 	lex.scanner.start = lex.scanner.pos
 	for {
-		ch := lex.scanner.peek()
+		ch := lex.scanner.read()
 		if ch == '\n' {
 			lex.scanner.line++
-		} else if ch == eof {
-			lex.scanner.buf.Reset()
-			return false
 		} else if ch == '"' {
 			// TODO: can decide if we want to check the next
 			// if it something wrong there
-			//next := lex.scanner.peek()
 			return true
+		} else if ch == eof {
+			return false
 		}
-		lex.scanner.buf.WriteRune(lex.scanner.read())
+		lex.scanner.buf.WriteRune(ch)
 	}
 }
 
@@ -323,6 +326,10 @@ func fullScan(lex *Lexer) stateFunc {
 			lex.emit(SEMICOLON)
 		case ',':
 			lex.emit(DOT)
+		case '_':
+			lex.emit(PLACEHOLDER)
+		case '/':
+			lex.emit(SLASH)
 		case '.':
 			lex.emit(DOT)
 			if isDigit(lex.scanner.peek()) {
@@ -348,6 +355,7 @@ func fullScan(lex *Lexer) stateFunc {
 			} else {
 				lex.emit(EXCL)
 			}
+
 			// TODO: case when it is used as NOT
 			// lex.emit(NOT)
 			//lex.emit(ERROR)
@@ -383,6 +391,7 @@ func fullScan(lex *Lexer) stateFunc {
 		default:
 			if isAlpha(ch) {
 				if lex.extractIdentifier(ch) {
+					// TODO: the next char should not special
 					lex.emit(IDENTIFIER)
 				} else {
 					fmt.Println("identifier ups")
@@ -392,6 +401,7 @@ func fullScan(lex *Lexer) stateFunc {
 				// we detected the number, now we need to go back
 				// from the start to process the whole thing
 				if lex.extractNumber(ch) {
+					// TODO: the next char should not special
 					lex.emit(NUMBER)
 				} else {
 					fmt.Println("number ups")
@@ -409,10 +419,17 @@ func fullScan(lex *Lexer) stateFunc {
 }
 
 func (lex *Lexer) emit(tType TokenType) {
-	value := lex.scanner.buf.String()
-	tokenType, found := keys[value]
-	if found {
-		tType = tokenType
+	value := ""
+	if lex.scanner.buf.Len() > 0 {
+		value = lex.scanner.buf.String()
+		tokenType, foundType := keys[value]
+		if foundType {
+			tType = tokenType
+		}
+	}
+	tokenValue, foundValue := reverseKeys[tType]
+	if foundValue {
+		value = tokenValue
 	}
 	lex.tokens <- Token{
 		tokenType: tType,
@@ -480,7 +497,8 @@ func main() {
 
 		for {
 			token := lex.nextToken()
-			wannaPrint(token)
+			//wannaPrint(token)
+			fmt.Print(token.value, " ")
 			if token.tokenType == EOF {
 				break
 			}

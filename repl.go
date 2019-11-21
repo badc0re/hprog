@@ -2,8 +2,8 @@ package main
 
 import (
 	"bufio"
-	//"flag"
 	"bytes"
+	"flag"
 	"fmt"
 	"io"
 	"os"
@@ -51,6 +51,8 @@ const (
 	ELSE
 	NOT
 	PLACEHOLDER
+	DEFINE
+	DECLARE
 
 	ARGS
 
@@ -89,8 +91,10 @@ var keys = map[string]TokenType{
 	"==": EQUAL_EQUAL,
 
 	// Keywords
-	"if":   IF,
-	"else": ELSE,
+	"if":      IF,
+	"else":    ELSE,
+	"define":  DEFINE,
+	"declare": DECLARE,
 
 	"args": ARGS,
 
@@ -119,6 +123,16 @@ func reverseMap(m map[string]TokenType) map[TokenType]string {
 
 var eof = rune(0)
 
+func wannaPrint(token Token) {
+	humanToken, found := reverseKey[token.tokenType]
+	printFormat := "type: %d, value: %s, start: %d, end: %d, line:%d, human:%s\n"
+	if found == true {
+		fmt.Printf(printFormat, token.tokenType, token.value, token.pos, token.end, token.line, humanToken)
+	} else {
+		fmt.Println(printFormat, token.tokenType, token.pos, token.end, token.line, token.value, token)
+	}
+}
+
 func isWhitespace(ch rune) bool { return ch == ' ' || ch == '\t' || ch == '\r' }
 
 func isAlpha(ch rune) bool { return unicode.IsLetter(ch) }
@@ -130,9 +144,9 @@ func isAlphaNumeric(ch rune) bool { return isAlpha(ch) || isDigit(ch) }
 type Token struct {
 	tokenType TokenType
 	value     string
-
-	pos  Pos
-	line Line
+	pos       Pos
+	end       Pos
+	line      Line
 }
 
 type Reader struct {
@@ -241,8 +255,9 @@ func (lex *Lexer) extractNumber(ch rune) bool {
 
 	foundPoint := false
 	for {
-		ch := lex.scanner.read()
+		ch := lex.scanner.peek()
 		if isDigit(ch) {
+			lex.scanner.read()
 			lex.scanner.buf.WriteRune(ch)
 		} else if ch == '.' {
 			// allow 1..0
@@ -251,6 +266,7 @@ func (lex *Lexer) extractNumber(ch rune) bool {
 				return false
 			}
 			foundPoint = true
+			lex.scanner.read()
 			lex.scanner.buf.WriteRune(ch)
 		} else if isAlpha(ch) {
 			lex.scanner.buf.Reset()
@@ -278,7 +294,6 @@ func (lex *Lexer) extractIdentifier(ch rune) bool {
 		} else if !isAlphaNumeric {
 			return true
 		} else if ch == eof {
-			fmt.Println("bla2")
 			lex.scanner.buf.Reset()
 			return false
 		}
@@ -317,8 +332,7 @@ func fullScan(lex *Lexer) stateFunc {
 			// TODO: .. range char not sovled
 			/*
 				if isDigit(lex.scanner.peek()) {
-					lex.scanner.unread()
-					if lex.extractNumber() {
+					if lex.extractNumber(ch) {
 						lex.emit(NUMBER)
 					}
 				} else if !isAlpha(lex.scanner.peek()) {
@@ -374,19 +388,17 @@ func fullScan(lex *Lexer) stateFunc {
 					fmt.Println("identifier ups")
 				}
 			}
-			/*
-				if isDigit(ch) {
-					// we detected the number, now we need to go back
-					// from the start to process the whole thing
-					if lex.extractNumber(ch) {
-						lex.emit(NUMBER)
-					} else {
-						fmt.Println("number ups")
-					}
+			if isDigit(ch) {
+				// we detected the number, now we need to go back
+				// from the start to process the whole thing
+				if lex.extractNumber(ch) {
+					lex.emit(NUMBER)
 				} else {
-					// error
+					fmt.Println("number ups")
 				}
-			*/
+			} else {
+				// error
+			}
 			if ch == eof {
 				//fmt.Println("it is the end!!!")
 				lex.emit(EOF)
@@ -397,16 +409,6 @@ func fullScan(lex *Lexer) stateFunc {
 }
 
 func (lex *Lexer) emit(tType TokenType) {
-	// need more info
-
-	/*
-		tokenType TokenType
-		value     string
-
-		start Pos
-		end   Pos
-		line  Line
-	*/
 	value := lex.scanner.buf.String()
 	tokenType, found := keys[value]
 	if found {
@@ -415,6 +417,8 @@ func (lex *Lexer) emit(tType TokenType) {
 	lex.tokens <- Token{
 		tokenType: tType,
 		pos:       lex.scanner.start,
+		end:       lex.scanner.pos,
+		line:      lex.scanner.line,
 		value:     value,
 	}
 	lex.scanner.buf.Reset()
@@ -454,59 +458,66 @@ func readline(idet string, scanner *bufio.Scanner) bool {
 
 func main() {
 	// direct file parser
-	/*
-		var inputFile string
-		flag.StringVar(&inputFile, "file", "", "Input hell file.")
-		flag.Parse()
-
-		fmt.Println(inputFile)
-			hFile, err := os.Open(inputFile)
-			if err != nil {
-				fmt.Println(err)
-				return
-			}
-			runeReader := io.RuneReader(bufio.NewReader(hFile))
-			fmt.Println(runeReader.ReadRune())
-	*/
-	// repl
-
 	var buffer []string
-	const idet = "hprog> "
+	var inputFile string
+	flag.StringVar(&inputFile, "file", "", "Input hell file.")
+	flag.Parse()
 
-	fmt.Println("Hprog Version 0.0.0.0.0.0.0.0.2")
-	fmt.Println("One way to escape, ctr-c to exit.")
+	fmt.Println(inputFile)
+	hFile, err := os.Open(inputFile)
+	if hFile != nil {
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		fileScanner := bufio.NewScanner(hFile)
+		for fileScanner.Scan() {
+			buffer = append(buffer, fileScanner.Text())
+		}
 
-	scanner := bufio.NewScanner(os.Stdin)
+		fmt.Println(strings.Join(buffer[:], "\n"))
+		lex := startGrinding(strings.Join(buffer[:], "\n"))
 
-	onNewLine := func(data []byte, atEOF bool) (advance int, token []byte, err error) {
-		return bufio.ScanLines(data, atEOF)
-	}
-
-	scanner.Split(onNewLine)
-	for {
-		for readline(idet, scanner) {
-			var sline = scanner.Text()
-			if len(sline) > 0 {
-				lex := startGrinding(sline)
-				for {
-					token := lex.nextToken()
-					humanToken, found := reverseKey[token.tokenType]
-					if found == true {
-						fmt.Println(token, humanToken)
-					} else {
-						fmt.Println(token)
-					}
-					if token.tokenType == EOF {
-						break
-					}
-				}
-
-				buffer = append(buffer, sline)
+		for {
+			token := lex.nextToken()
+			wannaPrint(token)
+			if token.tokenType == EOF {
+				break
 			}
 		}
-	}
+	} else {
+		const idet = "hprog> "
 
-	if scanner.Err() != nil {
-		fmt.Printf("error: %s\n", scanner.Err())
+		fmt.Println("Hprog Version 0.0.0.0.0.0.0.0.2")
+		fmt.Println("One way to escape, ctr-c to exit.")
+
+		scanner := bufio.NewScanner(os.Stdin)
+
+		onNewLine := func(data []byte, atEOF bool) (advance int, token []byte, err error) {
+			return bufio.ScanLines(data, atEOF)
+		}
+
+		scanner.Split(onNewLine)
+		for {
+			for readline(idet, scanner) {
+				var sline = scanner.Text()
+				if len(sline) > 0 {
+					lex := startGrinding(sline)
+					for {
+						token := lex.nextToken()
+						wannaPrint(token)
+						if token.tokenType == EOF {
+							break
+						}
+					}
+
+					buffer = append(buffer, sline)
+				}
+			}
+		}
+
+		if scanner.Err() != nil {
+			fmt.Printf("error: %s\n", scanner.Err())
+		}
 	}
 }

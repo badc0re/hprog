@@ -101,9 +101,10 @@ var keys = map[string]TokenType{
 	"true":  TRUE,
 
 	// reserver for dbg
-	"<STRING>": STRING,
-	"<NUMBER>": NUMBER,
-	"\\0":      EOF,
+	"<STRING>":     STRING,
+	"<IDENTIFIER>": IDENTIFIER,
+	"<NUMBER>":     NUMBER,
+	"\\0":          EOF,
 }
 
 var reverseKey = reverseMap(keys)
@@ -197,6 +198,7 @@ func (scanner *Scanner) futureMatch(fch rune) bool {
 	} else if ch == fch {
 		return true
 	}
+	scanner.unread()
 	return false
 }
 
@@ -245,10 +247,14 @@ func (lex *Lexer) extractNumber(ch rune) bool {
 		} else if ch == '.' {
 			// allow 1..0
 			if foundPoint == true {
+				lex.scanner.buf.Reset()
 				return false
 			}
 			foundPoint = true
 			lex.scanner.buf.WriteRune(ch)
+		} else if isAlpha(ch) {
+			lex.scanner.buf.Reset()
+			return false
 		} else if ch == eof {
 			// TODO: we don't want to have only numbers
 			// return false
@@ -264,16 +270,17 @@ func (lex *Lexer) extractIdentifier(ch rune) bool {
 	lex.scanner.start = lex.scanner.pos
 	lex.scanner.buf.WriteRune(ch)
 	for {
-		ch = lex.scanner.read()
-		if isAlphaNumeric(ch) {
+		ch = lex.scanner.peek()
+		isAlphaNumeric := isAlphaNumeric(ch)
+		if isAlphaNumeric {
 			lex.scanner.buf.WriteRune(ch)
+			lex.scanner.read()
+		} else if !isAlphaNumeric {
+			return true
 		} else if ch == eof {
-			// TODO: we don't want to have only numbers
-			// return false
-			return true
-		} else {
-			// TODO: also after the number more char can be covered
-			return true
+			fmt.Println("bla2")
+			lex.scanner.buf.Reset()
+			return false
 		}
 	}
 }
@@ -367,17 +374,19 @@ func fullScan(lex *Lexer) stateFunc {
 					fmt.Println("identifier ups")
 				}
 			}
-			if isDigit(ch) {
-				// we detected the number, now we need to go back
-				// from the start to process the whole thing
-				if lex.extractNumber(ch) {
-					lex.emit(NUMBER)
+			/*
+				if isDigit(ch) {
+					// we detected the number, now we need to go back
+					// from the start to process the whole thing
+					if lex.extractNumber(ch) {
+						lex.emit(NUMBER)
+					} else {
+						fmt.Println("number ups")
+					}
 				} else {
-					fmt.Println("number ups")
+					// error
 				}
-			} else {
-				// error
-			}
+			*/
 			if ch == eof {
 				//fmt.Println("it is the end!!!")
 				lex.emit(EOF)
@@ -484,6 +493,8 @@ func main() {
 					humanToken, found := reverseKey[token.tokenType]
 					if found == true {
 						fmt.Println(token, humanToken)
+					} else {
+						fmt.Println(token)
 					}
 					if token.tokenType == EOF {
 						break

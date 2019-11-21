@@ -49,6 +49,8 @@ const (
 	// Keywords
 	IF
 	ELSE
+	NOT
+	PLACEHOLDER
 
 	ARGS
 
@@ -101,6 +103,7 @@ var keys = map[string]TokenType{
 	// reserver for dbg
 	"<STRING>": STRING,
 	"<NUMBER>": NUMBER,
+	"\\0":      EOF,
 }
 
 var reverseKey = reverseMap(keys)
@@ -177,7 +180,7 @@ func (scanner *Scanner) reportError() {
 
 }
 
-func (scanner *Scanner) peekRune() (ch rune) {
+func (scanner *Scanner) peek() (ch rune) {
 	ch = scanner.read()
 	if ch != eof {
 		scanner.unread()
@@ -207,17 +210,17 @@ func (lex *Lexer) trimWhitespace() {
 			lex.scanner.unread()
 			break
 		}
+		lex.scanner.pos++
 	}
 }
 
 func (lex *Lexer) extractString() bool {
 	lex.scanner.start = lex.scanner.pos
 	for {
-		ch := lex.scanner.read()
+		ch := lex.scanner.peek()
 		if ch == '\n' {
 			lex.scanner.line++
 		} else if ch == eof {
-			fmt.Println("ups")
 			lex.scanner.buf.Reset()
 			return false
 		} else if ch == '"' {
@@ -225,14 +228,52 @@ func (lex *Lexer) extractString() bool {
 			// if it something wrong there
 			//next := lex.scanner.peek()
 			return true
-		} else {
 		}
-		lex.scanner.buf.WriteRune(ch)
+		lex.scanner.buf.WriteRune(lex.scanner.read())
 	}
 }
 
-func (lex *Lexer) extractDigit() {
+func (lex *Lexer) extractNumber() bool {
+	lex.scanner.start = lex.scanner.pos
+	foundPoint := false
+	for {
+		ch := lex.scanner.read()
+		fmt.Println(string(ch))
+		if isDigit(ch) {
+			lex.scanner.buf.WriteRune(ch)
+		} else if ch == '.' {
+			// allow 1..0
+			if foundPoint == true {
+				return false
+			}
+			foundPoint = true
+			lex.scanner.buf.WriteRune(ch)
+		} else if ch == eof {
+			// TODO: we don't want to have only numbers
+			// return false
+			return true
+		} else {
+			// TODO: also after the number more char can be covered
+			return true
+		}
+	}
+}
 
+func (lex *Lexer) extractIdentifier() bool {
+	lex.scanner.start = lex.scanner.pos
+	for {
+		ch := lex.scanner.read()
+		if isAlphaNumeric(ch) {
+			lex.scanner.buf.WriteRune(ch)
+		} else if ch == eof {
+			// TODO: we don't want to have only numbers
+			// return false
+			return true
+		} else {
+			// TODO: also after the number more char can be covered
+			return true
+		}
+	}
 }
 
 func fullScan(lex *Lexer) stateFunc {
@@ -260,7 +301,23 @@ func fullScan(lex *Lexer) stateFunc {
 			lex.emit(DOT)
 		case '.':
 			lex.emit(DOT)
-		// special cases
+			if isDigit(lex.scanner.peek()) {
+				fmt.Println("ups dot")
+			}
+			// TODO: special cases not solved: .01
+			// TODO: .. range char not sovled
+			/*
+				if isDigit(lex.scanner.peek()) {
+					lex.scanner.unread()
+					if lex.extractNumber() {
+						lex.emit(NUMBER)
+					}
+				} else if !isAlpha(lex.scanner.peek()) {
+					lex.emit(DOT)
+				} else {
+					fmt.Println("ups dot")
+				}
+			*/
 		case '!':
 			if lex.scanner.futureMatch('=') {
 				// TODO: need to handle a case wher it is not matched
@@ -290,22 +347,33 @@ func fullScan(lex *Lexer) stateFunc {
 			} else {
 				lex.emit(GREATER)
 			}
+		case '\t':
+		case '\r':
 		case '\n':
 			lex.scanner.line++
 		case '"':
 			if lex.extractString() {
 				lex.emit(STRING)
 			} else {
-				fmt.Println("ups")
+				fmt.Println("string ups")
 			}
 		default:
 			if isAlpha(ch) {
-				//fmt.Println("is alpha!!!")
-				lex.emit(IDENTIFIER)
+				if lex.extractIdentifier() {
+					lex.emit(IDENTIFIER)
+				} else {
+					fmt.Println("number ups")
+				}
 			}
 			if isDigit(ch) {
-				//fmt.Println("is digit!!!")
-				lex.emit(NUMBER)
+				// we detected the number, now we need to go back
+				// from the start to process the whole thing
+				lex.scanner.unread()
+				if lex.extractNumber() {
+					lex.emit(NUMBER)
+				} else {
+					fmt.Println("number ups")
+				}
 			} else {
 				// error
 			}
@@ -331,10 +399,11 @@ func (lex *Lexer) emit(tType TokenType) {
 	*/
 	lex.tokens <- Token{
 		tokenType: tType,
-		pos:       lex.scanner.pos,
+		pos:       lex.scanner.start,
 		value:     lex.scanner.buf.String(),
 	}
 	lex.scanner.buf.Reset()
+	lex.scanner.start = lex.scanner.pos
 }
 
 func (lex *Lexer) nextToken() Token {
@@ -408,7 +477,7 @@ func main() {
 					token := lex.nextToken()
 					humanToken, found := reverseKey[token.tokenType]
 					if found == true {
-						fmt.Println(humanToken)
+						fmt.Println(token, humanToken)
 					}
 					if token.tokenType == EOF {
 						break

@@ -1,9 +1,8 @@
-# hprog
-
-###Hell programming language
+# Hell programming language
+This is a functional language, f*ck classes.
 
 Why not as Lisp?
-- I simply can't follow all the brackets
+Why Lisp at all, I simply can't follow all the brackets.
 
 I want to switch functions with placeholers please
 

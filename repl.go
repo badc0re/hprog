@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	//"flag"
+	"bytes"
 	"fmt"
 	"io"
 	"os"
@@ -60,61 +61,84 @@ const (
 	EOF
 )
 
+var keys = map[string]TokenType{
+	"if":   IF,
+	"else": ELSE,
+	"args": ARGS,
+}
+
 var eof = rune(0)
 
-func isWhitespace(ch rune) bool {
-	// NOTE: extend this for other types
-	if ch == ' ' {
-		return true
-	}
-	return false
-}
+func isWhitespace(ch rune) bool { return ch == ' ' || ch == '\t' || ch == '\r' }
 
-func isAlpha(ch rune) bool {
-	return unicode.IsLetter(ch)
-}
+func isAlpha(ch rune) bool { return unicode.IsLetter(ch) }
 
-func isDigit(ch rune) bool {
-	return unicode.IsDigit(ch)
-}
+func isDigit(ch rune) bool { return unicode.IsDigit(ch) }
 
-func isAlphaNumeric(ch rune) bool {
-	return isAlpha(ch) || isDigit(ch)
+func isAlphaNumeric(ch rune) bool { return isAlpha(ch) || isDigit(ch) }
+
+type Token struct {
+	tokenType TokenType
+	value     string
+
+	pos  Pos
+	line Line
 }
 
 type Reader struct {
-	runeReader      io.RuneScanner
-	eof             bool
-	currentPosition Pos
-	// not used stuff is commented
-	//startPosition   Pos
-	//line            Line
+	runeReader io.RuneScanner
 }
 
 type Scanner struct {
+	pos    Pos
+	start  Pos
 	reader *Reader
+	line   Line
+	eof    bool
+	// not used stuff is commented
+	//startPosition   Pos
+	buf bytes.Buffer
+}
+
+type Lexer struct {
+	scanner *Scanner
+	tokens  chan Token // channel of detected tokens
 }
 
 func (reader *Reader) read() (ch rune) {
 	ch, _, _ = reader.runeReader.ReadRune()
-	reader.currentPosition++
 	return ch
 }
 
 func (reader *Reader) unread() {
 	// maybe err
 	reader.runeReader.UnreadRune()
-	reader.currentPosition--
 }
 
-func (scanner *Scanner) scan() (ch rune) {
+func (scanner *Scanner) unread() {
+	scanner.pos--
+	scanner.reader.unread()
+}
+
+func (scanner *Scanner) read() (ch rune) {
 	// propagate error
 	// handle eof
+	scanner.pos++
 	return scanner.reader.read()
 }
 
+func (scanner *Scanner) reportError() {
+
+}
+
+func (scanner *Scanner) peek() (ch rune) {
+	ch = scanner.read()
+	scanner.unread()
+	return ch
+}
+
 func (scanner *Scanner) futureMatch(fch rune) bool {
-	ch := scanner.scan()
+	ch := scanner.read()
 	if ch == eof {
 		// end of the road
 		fmt.Println("unformatted error!")
@@ -125,37 +149,12 @@ func (scanner *Scanner) futureMatch(fch rune) bool {
 	return false
 }
 
-func (scanner *Scanner) peek() (ch rune) {
-	ch = scanner.scan()
-	scanner.unread()
-	return ch
-}
-
-func (scanner *Scanner) unread() {
-	scanner.reader.unread()
-}
-
 // stet function that returns a state function
 type stateFunc func(*Lexer) stateFunc
 
-type Token struct {
-	tokenType TokenType
-
-	start Pos
-	end   Pos
-	line  Line
-	// optional based on the tokeType
-	content string
-}
-
-type Lexer struct {
-	scanner *Scanner
-	tokens  chan Token // channel of detected tokens
-}
-
 func (lex *Lexer) trimWhitespace() {
 	for {
-		ch := lex.scanner.scan()
+		ch := lex.scanner.read()
 		if !isWhitespace(ch) {
 			lex.scanner.unread()
 			break
@@ -163,9 +162,31 @@ func (lex *Lexer) trimWhitespace() {
 	}
 }
 
+func (lex *Lexer) extractString() bool {
+	lex.scanner.start = lex.scanner.pos
+	for {
+		ch := lex.scanner.read()
+		if ch == '"' {
+			return true
+		}
+
+		if ch == eof {
+			fmt.Println("ups")
+			lex.scanner.buf.Reset()
+			return false
+		}
+
+		lex.scanner.buf.WriteRune(ch)
+	}
+}
+
+func (lex *Lexer) extractDigit() {
+
+}
+
 func fullScan(lex *Lexer) stateFunc {
 	for {
-		switch ch := lex.scanner.scan(); ch {
+		switch ch := lex.scanner.read(); ch {
 		case ' ':
 			lex.trimWhitespace()
 		case '(':
@@ -218,7 +239,14 @@ func fullScan(lex *Lexer) stateFunc {
 			} else {
 				lex.emit(GREATER)
 			}
-			//lex.emit(ERROR)
+		case '\n':
+			lex.scanner.line++
+		case '"':
+			if lex.extractString() {
+				lex.emit(STRING)
+			} else {
+				fmt.Println("ups")
+			}
 		default:
 			if isAlpha(ch) {
 				//fmt.Println("is alpha!!!")
@@ -227,6 +255,8 @@ func fullScan(lex *Lexer) stateFunc {
 			if isDigit(ch) {
 				//fmt.Println("is digit!!!")
 				lex.emit(NUMBER)
+			} else {
+				// error
 			}
 			if ch == eof {
 				//fmt.Println("it is the end!!!")
@@ -234,12 +264,26 @@ func fullScan(lex *Lexer) stateFunc {
 			}
 		}
 	}
-	return nil
+	//return nil
 }
 
-func (lex *Lexer) emit(tokenType TokenType) {
+func (lex *Lexer) emit(tType TokenType) {
 	// need more info
-	lex.tokens <- Token{tokenType: tokenType}
+
+	/*
+		tokenType TokenType
+		value     string
+
+		start Pos
+		end   Pos
+		line  Line
+	*/
+	lex.tokens <- Token{
+		tokenType: tType,
+		pos:       lex.scanner.pos,
+		value:     lex.scanner.buf.String(),
+	}
+	lex.scanner.buf.Reset()
 }
 
 func (lex *Lexer) nextToken() Token {
@@ -311,7 +355,7 @@ func main() {
 				lex := startGrinding(sline)
 				for {
 					bla := lex.nextToken()
-					fmt.Println("token:", bla.tokenType)
+					fmt.Println("token:", bla.value)
 					if bla.tokenType == EOF {
 						break
 					}

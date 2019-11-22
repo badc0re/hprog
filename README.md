@@ -10,3 +10,4 @@ Not working
 Lexer:
 - 1..10 (ranges)
 - .11 floats starting with dot
+- Change bools with error messages and use a wrapper for the errors

@@ -62,7 +62,10 @@ const (
 	FALSE
 	TRUE
 
+	COMMENT
+	COMMENT_MULTILINE
 	NIL
+	ERR
 	EOF
 )
 
@@ -105,11 +108,13 @@ var keys = map[string]TokenType{
 	"false": FALSE,
 	"true":  TRUE,
 
+	"#": COMMENT,
+
 	// reserver for dbg
-	//	"<STRING>":     STRING,
-	//	"<IDENTIFIER>": IDENTIFIER,
-	//	"<NUMBER>":     NUMBER,
-	"\\0": EOF,
+	"<STRING>":     STRING,
+	"<IDENTIFIER>": IDENTIFIER,
+	"<NUMBER>":     NUMBER,
+	"\\0":          EOF,
 }
 
 var reverseKeys = reverseMap(keys)
@@ -125,8 +130,9 @@ func reverseMap(m map[string]TokenType) map[TokenType]string {
 var eof = rune(0)
 
 func wannaPrint(token Token) {
-	printFormat := "type: %d, value: %s, start: %d, end: %d, line:%d\n"
-	fmt.Printf(printFormat, token.tokenType, token.value, token.pos, token.end, token.line)
+	tokenTypeReadable, _ := reverseKeys[token.tokenType]
+	printFormat := "type: %s, value: %s, start: %d, end: %d, line:%d\n"
+	fmt.Printf(printFormat, tokenTypeReadable, token.value, token.pos, token.end, token.line)
 }
 
 func isWhitespace(ch rune) bool { return ch == ' ' || ch == '\t' || ch == '\r' }
@@ -136,6 +142,11 @@ func isAlpha(ch rune) bool { return unicode.IsLetter(ch) }
 func isDigit(ch rune) bool { return unicode.IsDigit(ch) }
 
 func isAlphaNumeric(ch rune) bool { return isAlpha(ch) || isDigit(ch) }
+
+func reportError(line Line, position Pos, what string) {
+	fmt.Fprintf(os.Stderr, "[line:%d, pos:%d] Error, %s\n",
+		line, position, what)
+}
 
 type Token struct {
 	tokenType TokenType
@@ -165,6 +176,9 @@ type Lexer struct {
 	tokens  chan Token // channel of detected tokens
 }
 
+// stet function that returns a state function
+type stateFunc func(*Lexer) stateFunc
+
 func (reader *Reader) read() (ch rune) {
 	ch, _, _ = reader.runeReader.ReadRune()
 	return ch
@@ -187,10 +201,6 @@ func (scanner *Scanner) read() (ch rune) {
 	return scanner.reader.read()
 }
 
-func (scanner *Scanner) reportError() {
-
-}
-
 func (scanner *Scanner) peek() (ch rune) {
 	ch = scanner.read()
 	if ch != eof {
@@ -203,7 +213,8 @@ func (scanner *Scanner) futureMatch(fch rune) bool {
 	ch := scanner.peek()
 	if ch == eof {
 		// end of the road
-		fmt.Println("unformatted error!")
+		reportError(scanner.line, scanner.pos,
+			"Reached EOF.")
 		return false
 	} else if ch == fch {
 		scanner.read()
@@ -211,9 +222,6 @@ func (scanner *Scanner) futureMatch(fch rune) bool {
 	}
 	return false
 }
-
-// stet function that returns a state function
-type stateFunc func(*Lexer) stateFunc
 
 func (lex *Lexer) trimWhitespace() {
 	for {
@@ -285,9 +293,11 @@ func (lex *Lexer) extractNumber(ch rune) bool {
 	}
 }
 
-func (lex *Lexer) extractIdentifier(ch rune) bool {
+func (lex *Lexer) extractIdentifier(ch rune) (extracted bool, identifierType TokenType) {
 	lex.scanner.start = lex.scanner.pos
 	lex.scanner.buf.WriteRune(ch)
+	extracted = false
+	identifierType = IDENTIFIER
 	for {
 		ch = lex.scanner.peek()
 		isAlphaNumeric := isAlphaNumeric(ch)
@@ -295,12 +305,27 @@ func (lex *Lexer) extractIdentifier(ch rune) bool {
 			lex.scanner.buf.WriteRune(ch)
 			lex.scanner.read()
 		} else if !isAlphaNumeric {
-			return true
+			// idk about this maybe change
+			//return true
+			extracted = true
+			break
 		} else if ch == eof {
 			lex.scanner.buf.Reset()
-			return false
+			//return false
+			reportError(lex.scanner.line, lex.scanner.pos,
+				"Reached EOL or OEF.")
+			extracted = false
+			break
 		}
 	}
+	// scan for the identifier type
+	if lex.scanner.buf.Len() > 0 {
+		tokenType, foundType := keys[lex.scanner.buf.String()]
+		if foundType {
+			identifierType = tokenType
+		}
+	}
+	return extracted, identifierType
 }
 
 func fullScan(lex *Lexer) stateFunc {
@@ -330,10 +355,14 @@ func fullScan(lex *Lexer) stateFunc {
 			lex.emit(PLACEHOLDER)
 		case '/':
 			lex.emit(SLASH)
+		case '#':
+			// TODO: extended to goto EOF
+			lex.emit(COMMENT)
 		case '.':
 			lex.emit(DOT)
 			if isDigit(lex.scanner.peek()) {
-				fmt.Println("ups dot")
+				reportError(lex.scanner.line, lex.scanner.pos,
+					"Invalid character provided after '.'.")
 			}
 			// TODO: special cases not solved: .01
 			// TODO: .. range char not sovled
@@ -386,18 +415,20 @@ func fullScan(lex *Lexer) stateFunc {
 			if lex.extractString() {
 				lex.emit(STRING)
 			} else {
-				fmt.Println("string ups")
+				reportError(lex.scanner.line, lex.scanner.pos,
+					"Wrong string formatting.")
 			}
 		default:
 			if isAlpha(ch) {
-				if lex.extractIdentifier(ch) {
+				extracted, identifier := lex.extractIdentifier(ch)
+				if extracted {
 					// TODO: the next char should not special
-					lex.emit(IDENTIFIER)
+					lex.emit(identifier)
 				} else {
-					fmt.Println("identifier ups")
+					reportError(lex.scanner.line, lex.scanner.pos,
+						"Invalid identifier.")
 				}
-			}
-			if isDigit(ch) {
+			} else if isDigit(ch) {
 				// we detected the number, now we need to go back
 				// from the start to process the whole thing
 				if lex.extractNumber(ch) {
@@ -405,13 +436,16 @@ func fullScan(lex *Lexer) stateFunc {
 					lex.emit(NUMBER)
 				} else {
 					fmt.Println("number ups")
+					reportError(lex.scanner.line, lex.scanner.pos,
+						"Invalid number.")
 				}
-			} else {
-				// error
-			}
-			if ch == eof {
+			} else if ch == eof {
 				//fmt.Println("it is the end!!!")
 				lex.emit(EOF)
+			} else {
+				reportError(lex.scanner.line, lex.scanner.pos,
+					"Invalid character.")
+				lex.emit(ERR)
 			}
 		}
 	}
@@ -419,17 +453,13 @@ func fullScan(lex *Lexer) stateFunc {
 }
 
 func (lex *Lexer) emit(tType TokenType) {
-	value := ""
-	if lex.scanner.buf.Len() > 0 {
-		value = lex.scanner.buf.String()
-		tokenType, foundType := keys[value]
-		if foundType {
-			tType = tokenType
+
+	value := lex.scanner.buf.String()
+	if len(value) == 0 {
+		tokenValue, foundValue := reverseKeys[tType]
+		if foundValue {
+			value = tokenValue
 		}
-	}
-	tokenValue, foundValue := reverseKeys[tType]
-	if foundValue {
-		value = tokenValue
 	}
 	lex.tokens <- Token{
 		tokenType: tType,

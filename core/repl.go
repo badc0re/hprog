@@ -44,6 +44,7 @@ const (
 	// Literals
 	IDENTIFIER
 	NUMBER
+	NIL
 	STRING
 
 	// Keywords
@@ -59,14 +60,14 @@ const (
 	AND
 	OR
 
-	FALSE
-	TRUE
+	BOOL_FALSE
+	BOOL_TRUE
 
 	COMMENT
 	COMMENT_MULTILINE
-	NIL
 	ERR
 	EOF
+	EOP // end of operation
 )
 
 var keys = map[string]TokenType{
@@ -105,8 +106,8 @@ var keys = map[string]TokenType{
 	"and": AND,
 	"or":  OR,
 
-	"false": FALSE,
-	"true":  TRUE,
+	"false": BOOL_FALSE,
+	"true":  BOOL_TRUE,
 
 	"#": COMMENT,
 
@@ -114,6 +115,7 @@ var keys = map[string]TokenType{
 	"<STRING>":     STRING,
 	"<IDENTIFIER>": IDENTIFIER,
 	"<NUMBER>":     NUMBER,
+	"<NIL>":        NIL,
 	"\\0":          EOF,
 }
 
@@ -209,7 +211,7 @@ func (scanner *Scanner) peek() (ch rune) {
 	return ch
 }
 
-func (scanner *Scanner) futureMatch(fch rune) bool {
+func (scanner *Scanner) seeFuture(fch rune) bool {
 	ch := scanner.peek()
 	if ch == eof {
 		// end of the road
@@ -223,7 +225,7 @@ func (scanner *Scanner) futureMatch(fch rune) bool {
 	return false
 }
 
-func (lex *Lexer) trimWhitespace() {
+func (lex *Lexer) walkOnWhitespace() {
 	for {
 		ch := lex.scanner.read()
 		if !isWhitespace(ch) {
@@ -318,7 +320,7 @@ func (lex *Lexer) extractIdentifier(ch rune) (extracted bool, identifierType Tok
 			break
 		}
 	}
-	// scan for the identifier type
+	// get identifier type
 	if lex.scanner.buf.Len() > 0 {
 		tokenType, foundType := keys[lex.scanner.buf.String()]
 		if foundType {
@@ -332,7 +334,7 @@ func fullScan(lex *Lexer) stateFunc {
 	for {
 		switch ch := lex.scanner.read(); ch {
 		case ' ':
-			lex.trimWhitespace()
+			lex.walkOnWhitespace()
 		case '(':
 			lex.emit(OP)
 		case ')':
@@ -358,58 +360,35 @@ func fullScan(lex *Lexer) stateFunc {
 		case '#':
 			// TODO: extended to goto EOF
 			lex.emit(COMMENT)
-		case '.':
-			lex.emit(DOT)
-			if isDigit(lex.scanner.peek()) {
-				reportError(lex.scanner.line, lex.scanner.pos,
-					"Invalid character provided after '.'.")
-			}
-			// TODO: special cases not solved: .01
-			// TODO: .. range char not sovled
-			/*
-				if isDigit(lex.scanner.peek()) {
-					if lex.extractNumber(ch) {
-						lex.emit(NUMBER)
-					}
-				} else if !isAlpha(lex.scanner.peek()) {
-					lex.emit(DOT)
-				} else {
-					fmt.Println("ups dot")
-				}
-			*/
 		case '!':
-			if lex.scanner.futureMatch('=') {
-				// TODO: need to handle a case wher it is not matched
+			if lex.scanner.seeFuture('=') {
+				// TODO: need to handle a case when it is not matched
 				lex.emit(EXCL_EQUAL)
 			} else {
 				lex.emit(EXCL)
 			}
-
 			// TODO: case when it is used as NOT
 			// lex.emit(NOT)
 			//lex.emit(ERROR)
 		case '=':
-			if lex.scanner.futureMatch('=') {
+			if lex.scanner.seeFuture('=') {
 				lex.emit(EQUAL_EQUAL)
 			} else {
 				lex.emit(EQUAL)
 			}
-			//lex.emit(ERROR)
+			// lex.emit(ERR)
 		case '<':
-			if lex.scanner.futureMatch('=') {
+			if lex.scanner.seeFuture('=') {
 				lex.emit(LESS_EQUAL)
 			} else {
 				lex.emit(LESS)
 			}
 		case '>':
-			if lex.scanner.futureMatch('=') {
+			if lex.scanner.seeFuture('=') {
 				lex.emit(GREATER_EQUAL)
 			} else {
 				lex.emit(GREATER)
 			}
-		case '\t':
-		case '\r':
-		case '\n':
 			lex.scanner.line++
 		case '"':
 			if lex.extractString() {
@@ -417,7 +396,11 @@ func fullScan(lex *Lexer) stateFunc {
 			} else {
 				reportError(lex.scanner.line, lex.scanner.pos,
 					"Wrong string formatting.")
+				lex.emit(ERR)
 			}
+		case '\t':
+		case '\r':
+		case '\n':
 		default:
 			if isAlpha(ch) {
 				extracted, identifier := lex.extractIdentifier(ch)
@@ -435,9 +418,9 @@ func fullScan(lex *Lexer) stateFunc {
 					// TODO: the next char should not special
 					lex.emit(NUMBER)
 				} else {
-					fmt.Println("number ups")
 					reportError(lex.scanner.line, lex.scanner.pos,
-						"Invalid number.")
+						"Invalid identifer.")
+					lex.emit(ERR)
 				}
 			} else if ch == eof {
 				//fmt.Println("it is the end!!!")
@@ -527,8 +510,8 @@ func main() {
 
 		for {
 			token := lex.nextToken()
-			//wannaPrint(token)
-			fmt.Print(token.value, " ")
+			wannaPrint(token)
+			//fmt.Print(token.value, " ")
 			if token.tokenType == EOF {
 				break
 			}
@@ -553,12 +536,11 @@ func main() {
 					lex := startGrinding(sline)
 					for {
 						token := lex.nextToken()
-						wannaPrint(token)
-						if token.tokenType == EOF {
+						if token.tokenType == EOF || token.tokenType == ERR {
 							break
 						}
+						wannaPrint(token)
 					}
-
 					buffer = append(buffer, sline)
 				}
 			}

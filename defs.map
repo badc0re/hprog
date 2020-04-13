@@ -1,0 +1,7 @@
+Literals. Numbers, strings, Booleans, and nil.
+
+Unary expressions. A prefix ! to perform a logical not, and - to negate a number.
+
+Binary expressions. The infix arithmetic (+, -, *, /) and logic (==, !=, <, <=, >, >=) operators we know and love.
+
+Parentheses for grouping.

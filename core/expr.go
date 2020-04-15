@@ -48,11 +48,8 @@ func (gexpr Grouping) accept(expr Expr) Expr {
 	grouping, _ := expr.(Grouping)
 	return gexpr.visitGroupingExpr(grouping)
 }
-
 func (thisExpr Binary) visitBinaryExpr(inputExpr Expr) Expr {
 	return inputExpr
-	//return parents()
-
 }
 
 func (thisExpr Unary) visitUnaryExpr(inputExpr Expr) Expr {
@@ -65,37 +62,4 @@ func (thisExpr Literal) visitLiteralExpr(inputExpr Expr) Expr {
 
 func (thisExpr Grouping) visitGroupingExpr(inputExpr Expr) Expr {
 	return inputExpr
-}
-
-func parents(name string, expr ...Expr) {
-
-}
-
-func bla() {
-	b := Binary{
-		operator: Token{
-			tokenType: STAR,
-			pos:       0,
-			end:       0,
-			line:      0,
-			value:     "*",
-		},
-		left: Unary{
-			operator: Token{
-				tokenType: MINUS,
-				pos:       0,
-				end:       0,
-				line:      0,
-				value:     "-",
-			},
-			right: Literal{
-				value: 123,
-			},
-		},
-		right: Grouping{
-			expression: Literal{
-				value: 45.67,
-			},
-		},
-	}
 }

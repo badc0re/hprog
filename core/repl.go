@@ -28,7 +28,9 @@ func main() {
 
 	fmt.Println(inputFile)
 	hFile, err := os.Open(inputFile)
-	accept()
+
+	bla()
+
 	if hFile != nil {
 		if err != nil {
 			fmt.Println(err)

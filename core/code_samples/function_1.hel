@@ -1,4 +1,4 @@
-(define sum(args n1=0 n2=2 n4=3 n4)
+(define sum(args int:n1=0 int:n2=2 int:n4=3 int:n4)
     (+ n1 n2 n3 n4)
     (/ _ 4)
     (filter _ <4)

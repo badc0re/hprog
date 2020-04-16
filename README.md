@@ -15,3 +15,4 @@ Lexer (todo):
 
 Parse (todo):
 - not even started
+- Types

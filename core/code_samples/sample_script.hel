@@ -1,0 +1,9 @@
+declare int:a <- 10
+declare int:b <- 20
+declare int:c <- + a b
+declare bool:d <- or (== a b) (== 33 44)
+
+if d (print a)
+
+define sum -> (array[int]:n1)
+           <- int (+ array _)

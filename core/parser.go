@@ -1,5 +1,10 @@
 package main
 
+import (
+	"errors"
+	"fmt"
+)
+
 type Parser struct {
 	tokens  []Token
 	current int
@@ -17,6 +22,7 @@ func (parser Parser) check(ttype TokenType) bool {
 }
 
 func (parser Parser) advance() Token {
+	fmt.Println(parser.current)
 	if !parser.isEOF() {
 		parser.current++
 	}
@@ -31,10 +37,10 @@ func (parser Parser) previous() Token {
 	return parser.tokens[parser.current-1]
 }
 
-
 func (parser Parser) match(types ...TokenType) bool {
 	for _, ttype := range types {
 		if parser.check(ttype) {
+			fmt.Println(types)
 			parser.advance()
 			return true
 		}
@@ -42,98 +48,132 @@ func (parser Parser) match(types ...TokenType) bool {
 	return false
 }
 
-func (parser Parser) primary() Expr {
-	if parser.match(FALSE)
-	return Literal{value:"false"} 
+func (parser Parser) consume(tokenType TokenType, msg string) (Token, error) {
+	if parser.check(tokenType) {
+		return parser.advance(), nil
 	}
+	return parser.peek(), errors.New(msg)
+}
 
-	if parser.match(TRUE) {
-		return Literal{"true"} 
+func (parser Parser) primary() (Expr, error) {
+	if parser.match(BOOL_FALSE) {
+		return Literal{value: "false"}, nil
+	}
+	if parser.match(BOOL_TRUE) {
+		return Literal{value: "true"}, nil
 	}
 
 	if parser.match(NIL) {
-		return Literal{"nil"} 
+		return Literal{value: "nil"}, nil
 	}
 
 	if parser.match(NUMBER, STRING) {
-		return Literal(previous().literal)
+		return Literal{parser.previous().value}, nil
 	}
-	
-	if parser.match(OP) {
 
+	if parser.match(OP) {
+		expr, err := parser.expression()
+		parser.consume(CP, "Expected ')'")
+		return expr, err
 	}
+	return nil, errors.New("Expected expression.")
 }
 
-func (parser Parser) unary() Expr {
+func (parser Parser) unary() (Expr, error) {
 	if parser.match(EXCL, MINUS) {
 		operator := parser.previous()
-		right := parser.unary()
-		return Unary{operator, right}
+		right, err := parser.unary()
+		return Unary{operator, right}, err
 	}
-	return primary()
+	return parser.primary()
 }
 
-func (parser Parser) multiplication() Expr {
-	expr := unary()
+func (parser Parser) multiplication() (Expr, error) {
+	expr, err := parser.unary()
 
-	for match(SLASH, STAR) {
-		operator := previous()
-		right := unary()
+	for parser.match(SLASH, STAR) {
+		operator := parser.previous()
+		right, _err := parser.unary()
 		expr = Binary{
 			operator: operator,
 			left:     expr,
 			right:    right,
 		}
+		err = _err
 	}
-	return expr
+	return expr, err
 }
 
-func (parser Parser) addition() Expr {
-	expr := multiplication()
+func (parser Parser) addition() (Expr, error) {
+	expr, err := parser.multiplication()
 
-	for match(MINUS, PLUS) {
-		operator := previous()
-		right := multiplication()
+	for parser.match(MINUS, PLUS) {
+		operator := parser.previous()
+		right, _err := parser.multiplication()
 		expr = Binary{
 			operator: operator,
 			left:     expr,
 			right:    right,
 		}
+		err = _err
 	}
-	return expr
+	return expr, err
 }
 
-func (parser Parser) comparison() Expr {
-	expr := addition()
+func (parser Parser) comparison() (Expr, error) {
+	expr, err := parser.addition()
 
-	for match(GREATER, GREATER_EQUAL, LESS, LESS_EQUAL) {
-		operator := previous()
-		right := addition()
+	for parser.match(GREATER, GREATER_EQUAL, LESS, LESS_EQUAL) {
+		operator := parser.previous()
+		right, _err := parser.addition()
 		expr = Binary{
 			operator: operator,
 			left:     expr,
 			right:    right,
 		}
+		err = _err
 	}
-	return expr
+	return expr, err
 }
 
-func (parser Parser) equality() Expr {
+func (parser Parser) equality() (Expr, error) {
 	// (or (== (/ 1 2) 2) (== 33 44))
-	expr := comparison()
+	expr, err := parser.comparison()
 
-	for match(EXCL_EQUAL, EQUAL_EQUAL) {
-		operator := previous()
-		right := comparison()
+	for parser.match(EXCL_EQUAL, EQUAL_EQUAL) {
+		operator := parser.previous()
+		right, _err := parser.comparison()
 		expr = Binary{
 			operator: operator,
 			left:     expr,
 			right:    right,
 		}
+		// NOTE: can be propagated back without changing the current
+		err = _err
 	}
-	return expr
+	return expr, err
 }
 
-func (parser Parser) expression() Expr {
-	return equality()
+func (parser Parser) expression() (Expr, error) {
+	fmt.Println("ass")
+	bla, err := parser.equality()
+	fmt.Println("error", err)
+	return bla, err
+}
+
+func bla() {
+	var tokens []Token
+
+	lex := startGrinding("(<= 10 10)")
+	for {
+		token := lex.nextToken()
+		tokens = append(tokens, token)
+		//fmt.Println(reverseKeys[token.tokenType])
+		if token.tokenType == EOF || token.tokenType == ERR {
+			break
+		}
+		//fmt.Println(token.value)
+	}
+	parser := Parser{tokens: tokens, current: 0}
+	parser.expression()
 }

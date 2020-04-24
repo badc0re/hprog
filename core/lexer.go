@@ -30,6 +30,8 @@ const (
 	SEMICOLON
 	QUOTE
 
+	COLON
+
 	GREATER
 	GREATER_EQUAL
 	EXCL
@@ -61,6 +63,8 @@ const (
 	BOOL_FALSE
 	BOOL_TRUE
 
+	// types
+
 	COMMENT
 	COMMENT_MULTILINE
 	ERR
@@ -81,6 +85,7 @@ var keys = map[string]TokenType{
 	".":  DOT,
 	"-":  MINUS,
 	";":  SEMICOLON,
+	":":  COLON,
 	"\"": QUOTE,
 
 	">":  GREATER,
@@ -352,6 +357,8 @@ func fullScan(lex *Lexer) stateFunc {
 		case '#':
 			// TODO: extended to goto EOF
 			lex.emit(COMMENT)
+		case ':':
+			lex.emit(COLON)
 		case '!':
 			if lex.scanner.seeFuture('=') {
 				// TODO: need to handle a case when it is not matched

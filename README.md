@@ -45,3 +45,4 @@ This is a functional language.
 Sub-features:
 - Immutability (not)
 - Pure functions (not)
+- Lazy evaluation?

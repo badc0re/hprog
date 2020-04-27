@@ -21,7 +21,7 @@ func wannaPrint(token Token) {
 
 func main() {
 	// direct file parser
-	bla()
+	test()
 	/*
 		var buffer []string
 		var inputFile string

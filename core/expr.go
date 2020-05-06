@@ -1,6 +1,6 @@
 package main
 
-//import "fmt"
+import "fmt"
 
 type Expr interface {
 	accept(Expr) Expr
@@ -27,39 +27,46 @@ type Grouping struct {
 
 func (bexpr Binary) accept(expr Expr) Expr {
 	// tests type
-	binary, _ := expr.(Binary)
-	return bexpr.visitBinaryExpr(binary)
+	visitor, _ := expr.(Binary)
+	return visitor.visitBinaryExpr(bexpr)
 }
 
 func (uexpr Unary) accept(expr Expr) Expr {
 	// tests type
-	unary, _ := expr.(Unary)
-	return uexpr.visitUnaryExpr(unary)
+	visitor, _ := expr.(Unary)
+	return visitor.visitUnaryExpr(uexpr)
 }
 
 func (lexpr Literal) accept(expr Expr) Expr {
 	// tests type
-	literal, _ := expr.(Literal)
-	return lexpr.visitLiteralExpr(literal)
+	visitor, _ := expr.(Literal)
+	return visitor.visitLiteralExpr(lexpr)
 }
 
 func (gexpr Grouping) accept(expr Expr) Expr {
 	// tests type
-	grouping, _ := expr.(Grouping)
-	return gexpr.visitGroupingExpr(grouping)
+	visitor, _ := expr.(Grouping)
+	return visitor.visitGroupingExpr(gexpr)
 }
+
 func (thisExpr Binary) visitBinaryExpr(inputExpr Expr) Expr {
-	return inputExpr
+	fmt.Println("This binary:", inputExpr)
+	return thisExpr
 }
 
 func (thisExpr Unary) visitUnaryExpr(inputExpr Expr) Expr {
-	return inputExpr
+	fmt.Println("This unary:", inputExpr)
+	return thisExpr
 }
 
 func (thisExpr Literal) visitLiteralExpr(inputExpr Expr) Expr {
-	return inputExpr
+	fmt.Println("This literal:", inputExpr)
+	return thisExpr
 }
 
 func (thisExpr Grouping) visitGroupingExpr(inputExpr Expr) Expr {
-	return inputExpr
+	// fmt.Println("This grouping:", inputExpr)
+	// fmt.Println("This grouping expr:", thisExpr.expression)
+	return thisExpr
+	//return inputExpr.accept(thisExpr.expression)
 }

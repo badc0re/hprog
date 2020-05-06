@@ -1,8 +1,9 @@
 package main
 
 import (
-	"errors"
 	"fmt"
+	"github.com/pkg/errors"
+	"os"
 )
 
 type Parser struct {
@@ -18,11 +19,11 @@ func (parser *Parser) check(ttype TokenType) bool {
 	if ttype == EOF {
 		return false
 	}
+
 	return parser.peek().tokenType == ttype
 }
 
 func (parser *Parser) advance() Token {
-	fmt.Println(parser.current)
 	if !parser.isEOF() {
 		parser.current++
 	}
@@ -70,23 +71,65 @@ func (parser *Parser) primary() (Expr, error) {
 		return Literal{parser.previous().value}, nil
 	}
 
-	if parser.match(OP) {
-		expr, err := parser.expression()
-		_, err = parser.consume(CP, "Expected ')' for the expression.")
-		return Grouping{expr}, err
-	}
-	return nil, errors.New("Expected expression.")
+	return nil, errors.New("Cannot parse expression.")
 }
 
 func (parser *Parser) unary() (Expr, error) {
 	if parser.match(EXCL, MINUS) {
 		operator := parser.previous()
-		right, err := parser.unary()
-		return Unary{operator, right}, err
+		expr, err := parser.unary()
+		if err != nil {
+			return nil, errors.WithMessage(err, "Cannot parser construct unary expression.")
+		}
+		return Unary{operator, expr}, err
 	}
-	fmt.Println("primary")
-	return parser.primary()
+
+	expr, err := parser.primary()
+	if err != nil {
+		return nil, errors.WithMessage(err, "Cannot parser primary expression.")
+	}
+	return expr, err
 }
+
+func (parser *Parser) statement() (Expr, error) {
+	if parser.match(OP) {
+		// first the operator
+		operator := parser.advance()
+
+		left_expr, err := parser.expression()
+		if err != nil {
+			return nil, errors.WithMessage(err, "Cannot parse left expresssion.")
+		}
+		right_expr, err := parser.expression()
+		if err != nil {
+			return nil, errors.WithMessage(err, "Cannot parse right expression.")
+		}
+		_, err = parser.consume(CP, "Expected ')' for the expression.")
+		if err != nil {
+			return nil, errors.WithMessage(err, "Cannot parse right expression.")
+		}
+		return Grouping{
+			Binary{
+				operator: operator,
+				left:     left_expr,
+				right:    right_expr,
+			},
+		}, err
+	}
+
+	// to be replaced
+	expr, err := parser.unary()
+	if err != nil {
+		return nil, errors.WithMessage(err, "Cannot parse unary expression.")
+	}
+	return expr, err
+}
+
+func (parser *Parser) equality() (Expr, error) {
+	return parser.statement()
+}
+
+/*
 
 func (parser *Parser) multiplication() (Expr, error) {
 	expr, err := parser.unary()
@@ -131,7 +174,7 @@ func (parser *Parser) comparison() (Expr, error) {
 			left:     expr,
 			right:    right,
 		}
-		err = _err
+		err = _eriiiuur
 	}
 	return expr, err
 }
@@ -154,6 +197,7 @@ func (parser *Parser) equality() (Expr, error) {
 	}
 	return expr, err
 }
+*/
 
 func (parser *Parser) expression() (Expr, error) {
 	return parser.equality()
@@ -162,7 +206,7 @@ func (parser *Parser) expression() (Expr, error) {
 func test() {
 	var tokens []Token
 
-	lex := startGrinding("(== 33 44)")
+	lex := startGrinding("(== (max 3 4) 4)(AA)")
 	for {
 		token := lex.nextToken()
 		tokens = append(tokens, token)
@@ -170,10 +214,13 @@ func test() {
 			break
 		}
 	}
+	//fmt.Printf("%#v\n\n", tokens)
+
 	parser := Parser{tokens: tokens, current: 0}
 	expr, err := parser.expression()
 	if err != nil {
-		fmt.Println(err)
+		fmt.Println("ERROR:", err)
+		os.Exit(1)
 	}
 	prints(expr)
 }

@@ -6,4 +6,4 @@ declare bool:d <- (or (== a b) (== 33 44))
 if d (print a)
 
 define sum -> (array[int]:n1)
-           <- int map(+ (n1 (_filter (x < 2))))
+           <- int map(+ (_filter (n1 (x < 2))))

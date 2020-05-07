@@ -83,15 +83,11 @@ func (parser *Parser) unary() (Expr, error) {
 		}
 		return Unary{operator, expr}, err
 	}
-
-	expr, err := parser.primary()
-	if err != nil {
-		return nil, errors.WithMessage(err, "Cannot parser primary expression.")
-	}
-	return expr, err
+	return parser.primary()
 }
 
 func (parser *Parser) statement() (Expr, error) {
+	expr, err := parser.unary()
 	if parser.match(OP) {
 		// first the operator
 		operator := parser.advance()
@@ -118,10 +114,6 @@ func (parser *Parser) statement() (Expr, error) {
 	}
 
 	// to be replaced
-	expr, err := parser.unary()
-	if err != nil {
-		return nil, errors.WithMessage(err, "Cannot parse unary expression.")
-	}
 	return expr, err
 }
 
@@ -206,7 +198,7 @@ func (parser *Parser) expression() (Expr, error) {
 func test() {
 	var tokens []Token
 
-	lex := startGrinding("(== (max 3 4) 4)(AA)")
+	lex := startGrinding("(== (max -3 -4) 4)(AA)")
 	for {
 		token := lex.nextToken()
 		tokens = append(tokens, token)

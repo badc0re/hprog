@@ -1,46 +1,15 @@
+<nil>
 (main.Grouping) {
  expression: (main.Binary) {
   operator: (main.Token) {
-   tokenType: (main.TokenType) 21,
-   value: (string) (len=2) "==",
-   pos: (main.Pos) 1,
-   end: (main.Pos) 3,
+   tokenType: (main.TokenType) 22,
+   value: (string) (len=3) "max",
+   pos: (main.Pos) 2,
+   end: (main.Pos) 4,
    line: (main.Line) 0
   },
-  left: (main.Grouping) {
-   expression: (main.Binary) {
-    operator: (main.Token) {
-     tokenType: (main.TokenType) 22,
-     value: (string) (len=3) "max",
-     pos: (main.Pos) 6,
-     end: (main.Pos) 8,
-     line: (main.Line) 0
-    },
-    left: (main.Unary) {
-     operator: (main.Token) {
-      tokenType: (main.TokenType) 10,
-      value: (string) (len=1) "-",
-      pos: (main.Pos) 8,
-      end: (main.Pos) 10,
-      line: (main.Line) 0
-     },
-     right: (main.Literal) {
-      value: (string) (len=1) "3"
-     }
-    },
-    right: (main.Unary) {
-     operator: (main.Token) {
-      tokenType: (main.TokenType) 10,
-      value: (string) (len=1) "-",
-      pos: (main.Pos) 11,
-      end: (main.Pos) 13,
-      line: (main.Line) 0
-     },
-     right: (main.Literal) {
-      value: (string) (len=1) "4"
-     }
-    }
-   }
+  left: (main.Literal) {
+   value: (string) (len=1) "3"
   },
   right: (main.Literal) {
    value: (string) (len=1) "4"

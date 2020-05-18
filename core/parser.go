@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	//"github.com/davecgh/go-spew/spew"
 	"github.com/pkg/errors"
 	"os"
 )
@@ -57,18 +58,28 @@ func (parser *Parser) consume(tokenType TokenType, msg string) (Token, error) {
 
 func (parser *Parser) primary() (Expr, error) {
 	if parser.match(BOOL_FALSE) {
-		return Literal{value: "false"}, nil
+		return Literal{object: "false"}, nil
 	}
 	if parser.match(BOOL_TRUE) {
-		return Literal{value: "true"}, nil
+		return Literal{object: "true"}, nil
 	}
 
 	if parser.match(NIL) {
-		return Literal{value: "nil"}, nil
+		return Literal{object: "nil"}, nil
 	}
 
-	if parser.match(NUMBER, STRING) {
-		return Literal{parser.previous().value}, nil
+	if parser.match(NUMBER) {
+		return Literal{object: parser.previous().value}, nil
+	}
+
+	if parser.match(STRING) {
+		return Literal{object: parser.previous().value}, nil
+	}
+
+	if parser.match(OP) {
+		expr, err := parser.expression()
+		_, err = parser.consume(CP, "Expected ')' for the expression.")
+		return Grouping{expr}, err
 	}
 
 	return nil, errors.New("Cannot parse expression.")
@@ -86,55 +97,17 @@ func (parser *Parser) unary() (Expr, error) {
 	return parser.primary()
 }
 
-func (parser *Parser) statement() (Expr, error) {
-	expr, err := parser.unary()
-	if parser.match(OP) {
-		// first the operator
-		operator := parser.advance()
-
-		left_expr, err := parser.expression()
-		if err != nil {
-			return nil, errors.WithMessage(err, "Cannot parse left expresssion.")
-		}
-		right_expr, err := parser.expression()
-		if err != nil {
-			return nil, errors.WithMessage(err, "Cannot parse right expression.")
-		}
-		_, err = parser.consume(CP, "Expected ')' for the expression.")
-		if err != nil {
-			return nil, errors.WithMessage(err, "Cannot parse right expression.")
-		}
-		return Grouping{
-			Binary{
-				operator: operator,
-				left:     left_expr,
-				right:    right_expr,
-			},
-		}, err
-	}
-
-	// to be replaced
-	return expr, err
-}
-
-func (parser *Parser) equality() (Expr, error) {
-	return parser.statement()
-}
-
-/*
-
 func (parser *Parser) multiplication() (Expr, error) {
 	expr, err := parser.unary()
 
 	for parser.match(SLASH, STAR) {
 		operator := parser.previous()
-		right, _err := parser.unary()
-		expr = Binary{
+		right, err := parser.unary()
+		return Binary{
 			operator: operator,
 			left:     expr,
 			right:    right,
-		}
-		err = _err
+		}, err
 	}
 	return expr, err
 }
@@ -144,13 +117,12 @@ func (parser *Parser) addition() (Expr, error) {
 
 	for parser.match(MINUS, PLUS) {
 		operator := parser.previous()
-		right, _err := parser.multiplication()
-		expr = Binary{
+		right, err := parser.multiplication()
+		return Binary{
 			operator: operator,
 			left:     expr,
 			right:    right,
-		}
-		err = _err
+		}, err
 	}
 	return expr, err
 }
@@ -160,13 +132,12 @@ func (parser *Parser) comparison() (Expr, error) {
 
 	for parser.match(GREATER, GREATER_EQUAL, LESS, LESS_EQUAL) {
 		operator := parser.previous()
-		right, _err := parser.addition()
-		expr = Binary{
+		right, err := parser.addition()
+		return Binary{
 			operator: operator,
 			left:     expr,
 			right:    right,
-		}
-		err = _eriiiuur
+		}, err
 	}
 	return expr, err
 }
@@ -177,19 +148,15 @@ func (parser *Parser) equality() (Expr, error) {
 
 	for parser.match(EXCL_EQUAL, EQUAL_EQUAL) {
 		operator := parser.previous()
-		right, _err := parser.comparison()
-		fmt.Println("op", operator.value)
-		expr = Binary{
+		right, err := parser.comparison()
+		return Binary{
 			operator: operator,
 			left:     expr,
 			right:    right,
-		}
-		// NOTE: can be propagated back without changing the current
-		err = _err
+		}, err
 	}
 	return expr, err
 }
-*/
 
 func (parser *Parser) expression() (Expr, error) {
 	return parser.equality()
@@ -198,7 +165,7 @@ func (parser *Parser) expression() (Expr, error) {
 func test() {
 	var tokens []Token
 
-	lex := startGrinding("(== (max -3 -4) 4)(AA)")
+	lex := startGrinding("-2 - -4")
 	for {
 		token := lex.nextToken()
 		tokens = append(tokens, token)
@@ -206,10 +173,12 @@ func test() {
 			break
 		}
 	}
+	//fmt.Println(spew.Sdump(tokens))
 	//fmt.Printf("%#v\n\n", tokens)
 
 	parser := Parser{tokens: tokens, current: 0}
 	expr, err := parser.expression()
+	fmt.Println(err)
 	if err != nil {
 		fmt.Println("ERROR:", err)
 		os.Exit(1)

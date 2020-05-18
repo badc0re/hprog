@@ -7,3 +7,13 @@ multiplication → ( ( "/" | "*" ) unary unary ) ;
 unary          → ( "!" | "-" ) unary
                | primary ;
 primary        → NUMBER | STRING | "false" | "true" | "nil";
+
+
+expression     → equality ;
+equality -> statement
+statement       → ( ( "-" | "+" ) multiplication multiplication ) ;
+multiplication → ( ( "/" | "*" ) unary unary ) ;
+
+unary          → ( "!" | "-" ) unary
+               | primary ;
+primary        → NUMBER | STRING | "false" | "true" | "nil";

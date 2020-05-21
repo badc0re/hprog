@@ -2,7 +2,6 @@ package expr
 
 import (
 	"fmt"
-	"github.com/badc0re/hprog/lexer"
 	"github.com/pkg/errors"
 )
 

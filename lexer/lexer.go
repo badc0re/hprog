@@ -3,7 +3,6 @@ package lexer
 import (
 	"bytes"
 	"fmt"
-	"github.com/badc0re/hprog/token"
 	"io"
 	"os"
 	"strings"

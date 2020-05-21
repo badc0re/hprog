@@ -5,7 +5,6 @@ import (
 	//"github.com/davecgh/go-spew/spew"
 	"github.com/pkg/errors"
 	"os"
-	"strconv"
 )
 
 type Parser struct {
@@ -59,37 +58,18 @@ func (parser *Parser) consume(tokenType TokenType, msg string) (Token, error) {
 
 func (parser *Parser) primary() (Expr, error) {
 	if parser.match(BOOL_FALSE) {
-		return Literal{object: Object{value: "false"}}, nil
+		return Literal{value: "false"}, nil
 	}
 	if parser.match(BOOL_TRUE) {
-		return Literal{object: Object{value: "true"}}, nil
+		return Literal{value: "true"}, nil
 	}
 
 	if parser.match(NIL) {
-		return Literal{object: Object{value: "nil"}}, nil
+		return Literal{value: "nil"}, nil
 	}
 
-	if parser.match(NUMBER) {
-		msg := "Invalid expression for number"
-		_err := errors.New(msg)
-		value := parser.previous().value
-		if val, err := strconv.Atoi(value); err == nil {
-			return Literal{object: Object{value: val, internalType: "int"}}, nil
-		}
-		if val, err := strconv.ParseFloat(value, 64); err == nil {
-			return Literal{object: Object{value: val, internalType: "f64"}}, nil
-		}
-		return nil, _err
-	}
-
-	if parser.match(STRING) {
-		return Literal{object: Object{value: parser.previous().value}}, nil
-	}
-
-	if parser.match(OP) {
-		expr, err := parser.expression()
-		_, err = parser.consume(CP, "Expected ')' for the expression.")
-		return Grouping{expr}, err
+	if parser.match(NUMBER, STRING) {
+		return Literal{parser.previous().value}, nil
 	}
 
 	return nil, errors.New("Cannot parse expression.")
@@ -107,17 +87,60 @@ func (parser *Parser) unary() (Expr, error) {
 	return parser.primary()
 }
 
+func (parser *Parser) statement() (Expr, error) {
+	expr, err := parser.unary()
+	fmt.Println(err)
+	if parser.match(OP) {
+		if expr != nil {
+			return nil, errors.New("Invalid syntax, cannot have '(' after expression.")
+		}
+		// first the operator
+		operator := parser.advance()
+
+		left_expr, err := parser.expression()
+		if err != nil {
+			return nil, errors.WithMessage(err, "Cannot parse left expresssion.")
+		}
+		right_expr, err := parser.expression()
+		if err != nil {
+			return nil, errors.WithMessage(err, "Cannot parse right expression.")
+		}
+		_, err = parser.consume(CP, "Expected ')' for the expression.")
+		if err != nil {
+			return nil, errors.WithMessage(err, "Cannot parse right expression.")
+		}
+		return Grouping{
+			Binary{
+				operator: operator,
+				left:     left_expr,
+				right:    right_expr,
+			},
+		}, err
+	}
+
+	fmt.Println(expr)
+	// to be replaced
+	return expr, err
+}
+
+func (parser *Parser) equality() (Expr, error) {
+	return parser.statement()
+}
+
+/*
+
 func (parser *Parser) multiplication() (Expr, error) {
 	expr, err := parser.unary()
 
 	for parser.match(SLASH, STAR) {
 		operator := parser.previous()
-		right, err := parser.unary()
-		return Binary{
+		right, _err := parser.unary()
+		expr = Binary{
 			operator: operator,
 			left:     expr,
 			right:    right,
-		}, err
+		}
+		err = _err
 	}
 	return expr, err
 }
@@ -127,12 +150,13 @@ func (parser *Parser) addition() (Expr, error) {
 
 	for parser.match(MINUS, PLUS) {
 		operator := parser.previous()
-		right, err := parser.multiplication()
-		return Binary{
+		right, _err := parser.multiplication()
+		expr = Binary{
 			operator: operator,
 			left:     expr,
 			right:    right,
-		}, err
+		}
+		err = _err
 	}
 	return expr, err
 }
@@ -142,12 +166,13 @@ func (parser *Parser) comparison() (Expr, error) {
 
 	for parser.match(GREATER, GREATER_EQUAL, LESS, LESS_EQUAL) {
 		operator := parser.previous()
-		right, err := parser.addition()
-		return Binary{
+		right, _err := parser.addition()
+		expr = Binary{
 			operator: operator,
 			left:     expr,
 			right:    right,
-		}, err
+		}
+		err = _eriiiuur
 	}
 	return expr, err
 }
@@ -158,15 +183,19 @@ func (parser *Parser) equality() (Expr, error) {
 
 	for parser.match(EXCL_EQUAL, EQUAL_EQUAL) {
 		operator := parser.previous()
-		right, err := parser.comparison()
-		return Binary{
+		right, _err := parser.comparison()
+		fmt.Println("op", operator.value)
+		expr = Binary{
 			operator: operator,
 			left:     expr,
 			right:    right,
-		}, err
+		}
+		// NOTE: can be propagated back without changing the current
+		err = _err
 	}
 	return expr, err
 }
+*/
 
 func (parser *Parser) expression() (Expr, error) {
 	return parser.equality()
@@ -175,7 +204,7 @@ func (parser *Parser) expression() (Expr, error) {
 func test() {
 	var tokens []Token
 
-	lex := startGrinding("-2 - -4")
+	lex := startGrinding("(max 3 4) (max 1 2)")
 	for {
 		token := lex.nextToken()
 		tokens = append(tokens, token)

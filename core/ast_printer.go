@@ -7,6 +7,8 @@ import (
 
 func prints(expr Expr) {
 	// fmt.Printf("%+v\n", expr)
+	fmt.Println(spew.Sdump(expr))
 
+	fmt.Println("Result:")
 	fmt.Println(spew.Sdump(expr.accept(expr)))
 }

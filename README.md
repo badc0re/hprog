@@ -6,7 +6,6 @@ This is a functional language.
 - No states, only transformations
 - Everything is a function except variables
 - Variables are immutable
-- Functions can be referenced by aliases
 
 ## Lexer
 - Change handling of error messages, instead of bools, use a wrapper for the errors
@@ -21,8 +20,7 @@ This is a functional language.
 - .11 floats starting with dot
     - not allowed
 
-## Parse (todo)
-- not even started
+## Parse
 - Types
 
 ## Supported features

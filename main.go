@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
+	"github.com/badc0re/hprog/lexer"
 	"os"
 	"strings"
 )

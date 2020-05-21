@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/badc0re/hprog/lexer"
+	"github.com/badc0re/hprog/parser"
 	"os"
 	"strings"
 )

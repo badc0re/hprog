@@ -3,6 +3,8 @@ package parser
 import (
 	"fmt"
 	//"github.com/davecgh/go-spew/spew"
+	"github.com/badc0re/hprog/expr"
+	"github.com/badc0re/hprog/lexer"
 	"github.com/pkg/errors"
 	"os"
 	"strconv"

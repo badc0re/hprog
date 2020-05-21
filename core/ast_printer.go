@@ -5,10 +5,9 @@ import (
 	"github.com/davecgh/go-spew/spew"
 )
 
-func prints(expr Expr) {
+func astPrinter(expr Expr) {
 	// fmt.Printf("%+v\n", expr)
 	fmt.Println(spew.Sdump(expr))
-
 	fmt.Println("Result:")
 	fmt.Println(spew.Sdump(expr.accept(expr)))
 }

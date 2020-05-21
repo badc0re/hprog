@@ -116,6 +116,17 @@ func (thisExpr Binary) visitBinaryExpr(inputExpr Binary) (Object, error) {
 			right_value := right.value.(float64)
 			return Object{left_value * right_value, "f64"}, nil
 		}
+	} else if inputExpr.operator.tokenType == PLUS {
+		if left.internalType == "int" && right.internalType == "int" {
+			left_value := left.value.(int)
+			right_value := right.value.(int)
+			return Object{left_value + right_value, "int"}, nil
+		}
+		if left.internalType == "f64" && right.internalType == "f64" {
+			left_value := left.value.(float64)
+			right_value := right.value.(float64)
+			return Object{left_value + right_value, "f64"}, nil
+		}
 	}
 	return Object{}, nil
 }

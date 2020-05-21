@@ -172,7 +172,7 @@ func (parser *Parser) expression() (Expr, error) {
 	return parser.equality()
 }
 
-func test() {
+func parserExecutor() {
 	var tokens []Token
 
 	lex := startGrinding("-2 - -4")
@@ -193,5 +193,5 @@ func test() {
 		fmt.Println("ERROR:", err)
 		os.Exit(1)
 	}
-	prints(expr)
+	astPrinter(expr)
 }

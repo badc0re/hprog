@@ -3,8 +3,10 @@ package token
 import "fmt"
 
 type TokenType int
-type Pos int
-type Line int
+type TokenPos int
+type TokenLine int
+
+var Eof = rune(0)
 
 const (
 	ILLEGAL TokenType = iota
@@ -65,7 +67,7 @@ const (
 	EOP // end of operation
 )
 
-var keys = map[string]TokenType{
+var Keys = map[string]TokenType{
 	// single char tokens
 	"(":  OP,
 	")":  CP,
@@ -115,7 +117,7 @@ var keys = map[string]TokenType{
 	"\\0":          EOF,
 }
 
-var reverseKeys = reverseMap(keys)
+var ReverseKeys = reverseMap(Keys)
 
 func reverseMap(m map[string]TokenType) map[TokenType]string {
 	n := make(map[TokenType]string)
@@ -125,18 +127,16 @@ func reverseMap(m map[string]TokenType) map[TokenType]string {
 	return n
 }
 
-var eof = rune(0)
-
 type Token struct {
 	Type  TokenType
-	value string
-	pos   Pos
-	end   Pos
-	line  Line
+	Value string
+	Pos   TokenPos
+	End   TokenPos
+	Line  TokenLine
 }
 
-func print(token Token) {
-	tokenTypeReadable, _ := reverseKeys[token.Type]
+func Print(token Token) {
+	tokenTypeReadable, _ := ReverseKeys[token.Type]
 	printFormat := "type: %s, value: %s, start: %d, end: %d, line:%d\n"
-	fmt.Printf(printFormat, tokenTypeReadable, token.value, token.pos, token.end, token.line)
+	fmt.Printf(printFormat, tokenTypeReadable, token.Value, token.Pos, token.End, token.Line)
 }

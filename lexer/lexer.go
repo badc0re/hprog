@@ -3,13 +3,14 @@ package lexer
 import (
 	"bytes"
 	"fmt"
+	"github.com/badc0re/hprog/token"
 	"io"
 	"os"
 	"strings"
 	"unicode"
 )
 
-func reportError(line Line, position Pos, what string) {
+func reportError(line token.TokenLine, position token.TokenPos, what string) {
 	fmt.Fprintf(os.Stderr, "[line:%d, pos:%d] Error, %s\n",
 		line, position, what)
 }
@@ -27,10 +28,10 @@ type Reader struct {
 }
 
 type Scanner struct {
-	pos    Pos
-	start  Pos
+	pos    token.TokenPos
+	start  token.TokenPos
 	reader *Reader
-	line   Line
+	line   token.TokenLine
 	eof    bool
 	// not used stuff is commented
 	//startPosition   Pos
@@ -39,7 +40,7 @@ type Scanner struct {
 
 type Lexer struct {
 	scanner *Scanner
-	tokens  chan Token // channel of detected tokens
+	tokens  chan token.Token // channel of detected tokens
 }
 
 // stet function that returns a state function
@@ -69,7 +70,7 @@ func (scanner *Scanner) read() (ch rune) {
 
 func (scanner *Scanner) peek() (ch rune) {
 	ch = scanner.read()
-	if ch != eof {
+	if ch != token.Eof {
 		scanner.unread()
 	}
 	return ch
@@ -77,7 +78,7 @@ func (scanner *Scanner) peek() (ch rune) {
 
 func (scanner *Scanner) seeFuture(fch rune) bool {
 	ch := scanner.peek()
-	if ch == eof {
+	if ch == token.Eof {
 		// end of the road
 		reportError(scanner.line, scanner.pos,
 			"Reached EOF.")
@@ -103,7 +104,7 @@ func (lex *Lexer) walkOnWhitespace() {
 func (lex *Lexer) trimComment() {
 	for {
 		ch := lex.scanner.read()
-		if ch == eof {
+		if ch == token.Eof {
 			break
 		}
 	}
@@ -119,7 +120,7 @@ func (lex *Lexer) extractString() bool {
 			// TODO: can decide if we want to check the next
 			// if it something wrong there
 			return true
-		} else if ch == eof {
+		} else if ch == token.Eof {
 			return false
 		}
 		lex.scanner.buf.WriteRune(ch)
@@ -148,7 +149,7 @@ func (lex *Lexer) extractNumber(ch rune) bool {
 		} else if isAlpha(ch) {
 			lex.scanner.buf.Reset()
 			return false
-		} else if ch == eof {
+		} else if ch == token.Eof {
 			// TODO: we don't want to have only numbers
 			// return false
 			return true
@@ -159,11 +160,11 @@ func (lex *Lexer) extractNumber(ch rune) bool {
 	}
 }
 
-func (lex *Lexer) extractIdentifier(ch rune) (extracted bool, identifierType TokenType) {
+func (lex *Lexer) extractIdentifier(ch rune) (extracted bool, identifierType token.TokenType) {
 	lex.scanner.start = lex.scanner.pos
 	lex.scanner.buf.WriteRune(ch)
 	extracted = false
-	identifierType = IDENTIFIER
+	identifierType = token.IDENTIFIER
 	for {
 		ch = lex.scanner.peek()
 		isAlphaNumeric := isAlphaNumeric(ch)
@@ -175,7 +176,7 @@ func (lex *Lexer) extractIdentifier(ch rune) (extracted bool, identifierType Tok
 			//return true
 			extracted = true
 			break
-		} else if ch == eof {
+		} else if ch == token.Eof {
 			lex.scanner.buf.Reset()
 			//return false
 			reportError(lex.scanner.line, lex.scanner.pos,
@@ -186,7 +187,8 @@ func (lex *Lexer) extractIdentifier(ch rune) (extracted bool, identifierType Tok
 	}
 	// get identifier type
 	if lex.scanner.buf.Len() > 0 {
-		tokenType, foundType := keys[lex.scanner.buf.String()]
+		// rename Keys
+		tokenType, foundType := token.Keys[lex.scanner.buf.String()]
 		if foundType {
 			identifierType = tokenType
 		}
@@ -200,69 +202,69 @@ func fullScan(lex *Lexer) stateFunc {
 		case ' ':
 			lex.walkOnWhitespace()
 		case '(':
-			lex.emit(OP)
+			lex.emit(token.OP)
 		case ')':
-			lex.emit(CP)
+			lex.emit(token.CP)
 		case '{':
-			lex.emit(LB)
+			lex.emit(token.LB)
 		case '}':
-			lex.emit(RB)
+			lex.emit(token.RB)
 		case '+':
-			lex.emit(PLUS)
+			lex.emit(token.PLUS)
 		case '-':
-			lex.emit(MINUS)
+			lex.emit(token.MINUS)
 		case '*':
-			lex.emit(STAR)
+			lex.emit(token.STAR)
 		case ';':
-			lex.emit(SEMICOLON)
+			lex.emit(token.SEMICOLON)
 		case ',':
-			lex.emit(DOT)
+			lex.emit(token.DOT)
 		case '_':
-			lex.emit(PLACEHOLDER)
+			lex.emit(token.PLACEHOLDER)
 		case '/':
-			lex.emit(SLASH)
+			lex.emit(token.SLASH)
 		case '#':
 			// TODO: extended to goto EOF
-			lex.emit(COMMENT)
+			lex.emit(token.COMMENT)
 		case ':':
-			lex.emit(COLON)
+			lex.emit(token.COLON)
 		case '!':
 			if lex.scanner.seeFuture('=') {
 				// TODO: need to handle a case when it is not matched
-				lex.emit(EXCL_EQUAL)
+				lex.emit(token.EXCL_EQUAL)
 			} else {
-				lex.emit(EXCL)
+				lex.emit(token.EXCL)
 			}
 			// TODO: case when it is used as NOT
 			// lex.emit(NOT)
 			//lex.emit(ERROR)
 		case '=':
 			if lex.scanner.seeFuture('=') {
-				lex.emit(EQUAL_EQUAL)
+				lex.emit(token.EQUAL_EQUAL)
 			} else {
-				lex.emit(EQUAL)
+				lex.emit(token.EQUAL)
 			}
 			// lex.emit(ERR)
 		case '<':
 			if lex.scanner.seeFuture('=') {
-				lex.emit(LESS_EQUAL)
+				lex.emit(token.LESS_EQUAL)
 			} else {
-				lex.emit(LESS)
+				lex.emit(token.LESS)
 			}
 		case '>':
 			if lex.scanner.seeFuture('=') {
-				lex.emit(GREATER_EQUAL)
+				lex.emit(token.GREATER_EQUAL)
 			} else {
-				lex.emit(GREATER)
+				lex.emit(token.GREATER)
 			}
 			lex.scanner.line++
 		case '"':
 			if lex.extractString() {
-				lex.emit(STRING)
+				lex.emit(token.STRING)
 			} else {
 				reportError(lex.scanner.line, lex.scanner.pos,
 					"Wrong string formatting.")
-				lex.emit(ERR)
+				lex.emit(token.ERR)
 			}
 		case '\t':
 		case '\r':
@@ -282,45 +284,45 @@ func fullScan(lex *Lexer) stateFunc {
 				// from the start to process the whole thing
 				if lex.extractNumber(ch) {
 					// TODO: the next char should not special
-					lex.emit(NUMBER)
+					lex.emit(token.NUMBER)
 				} else {
 					reportError(lex.scanner.line, lex.scanner.pos,
 						"Invalid identifer.")
-					lex.emit(ERR)
+					lex.emit(token.ERR)
 				}
-			} else if ch == eof {
-				lex.emit(EOF)
+			} else if ch == token.Eof {
+				lex.emit(token.EOF)
 			} else {
 				reportError(lex.scanner.line, lex.scanner.pos,
 					"Invalid character.")
-				lex.emit(ERR)
+				lex.emit(token.ERR)
 			}
 		}
 	}
 	//return nil
 }
 
-func (lex *Lexer) emit(tType TokenType) {
+func (lex *Lexer) emit(tType token.TokenType) {
 
 	value := lex.scanner.buf.String()
 	if len(value) == 0 {
-		tokenValue, foundValue := reverseKeys[tType]
+		tokenValue, foundValue := token.ReverseKeys[tType]
 		if foundValue {
 			value = tokenValue
 		}
 	}
-	lex.tokens <- Token{
-		tokenType: tType,
-		pos:       lex.scanner.start,
-		end:       lex.scanner.pos,
-		line:      lex.scanner.line,
-		value:     value,
+	lex.tokens <- token.Token{
+		Type:  tType,
+		Pos:   lex.scanner.start,
+		End:   lex.scanner.pos,
+		Line:  lex.scanner.line,
+		Value: value,
 	}
 	lex.scanner.buf.Reset()
 	lex.scanner.start = lex.scanner.pos
 }
 
-func (lex *Lexer) nextToken() Token {
+func (lex *Lexer) NextToken() token.Token {
 	return <-lex.tokens
 }
 
@@ -333,14 +335,14 @@ func (lex *Lexer) run() {
 	close(lex.tokens)
 }
 
-func startGrinding(input string) (lex *Lexer) {
+func Consume(input string) (lex *Lexer) {
 	lex = &Lexer{
 		scanner: &Scanner{
 			reader: &Reader{
 				runeReader: strings.NewReader(input),
 			},
 		},
-		tokens: make(chan Token),
+		tokens: make(chan token.Token),
 	}
 	go lex.run()
 	return lex

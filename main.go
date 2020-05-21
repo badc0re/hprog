@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
+	"github.com/badc0re/hprog/lexer"
 	"github.com/badc0re/hprog/parser"
 	"github.com/badc0re/hprog/token"
 	"os"
@@ -37,13 +38,13 @@ func main() {
 		}
 
 		fmt.Println(strings.Join(buffer[:], "\n"))
-		lex := startGrinding(strings.Join(buffer[:], "\n"))
+		lex := lexer.Consume(strings.Join(buffer[:], "\n"))
 
 		for {
-			token := lex.nextToken()
-			token.print(token)
+			t := lex.NextToken()
+			//token.print(token)
 			//fmt.Print(token.value, " ")
-			if token.tokenType == token.EOF {
+			if t.Type == token.EOF {
 				break
 			}
 		}
@@ -64,23 +65,23 @@ func main() {
 			for readline(idet, scanner) {
 				var sline = scanner.Text()
 				if len(sline) > 0 {
-					lex := startGrinding(sline)
+					lex := lexer.Consume(sline)
 					var tokens []token.Token
 					for {
-						token := lex.nextToken()
-						tokens = append(tokens, token)
-						if token.tokenType == token.EOF || token.tokenType == token.ERR {
+						t := lex.NextToken()
+						tokens = append(tokens, t)
+						if t.Type == token.EOF || t.Type == token.ERR {
 							break
 						}
-						token.print(token)
+						token.Print(t)
 					}
-					parser := Parser{tokens: tokens, current: 0}
-					expr, err := parser.expression()
+					parser := parser.Parser{Tokens: tokens, Current: 0}
+					expr, err := parser.Expression()
 					if err != nil {
 						fmt.Println("ERROR:", err)
 						// os.Exit(1)
 					}
-					nexpr, err := expr.accept(expr)
+					nexpr, err := expr.Accept(expr)
 					fmt.Println(nexpr)
 					if err != nil {
 						fmt.Println("ERROR:", err)

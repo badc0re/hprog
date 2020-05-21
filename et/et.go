@@ -1,7 +1,8 @@
-package expr
+package et
 
 import (
 	"fmt"
+	"github.com/badc0re/hprog/token"
 	"github.com/pkg/errors"
 )
 
@@ -28,18 +29,18 @@ type Object struct {
 }
 
 type Binary struct {
-	operator Token
+	operator token.Token
 	left     Expr
 	right    Expr
 }
 
 type Unary struct {
-	operator Token
+	operator token.Token
 	right    Expr
 }
 
 type Literal struct {
-	object Object
+	Object Object
 }
 
 type Grouping struct {
@@ -83,7 +84,7 @@ func (thisExpr Binary) visitBinaryExpr(inputExpr Binary) (Object, error) {
 		return Object{}, errors.New(fmt.Sprintf("Missmatch type %s and %s", left.internalType, right.internalType))
 	}
 
-	if inputExpr.operator.tokenType == MINUS {
+	if inputExpr.operator.Type == token.MINUS {
 		if left.internalType == "int" && right.internalType == "int" {
 			left_value := left.value.(int)
 			right_value := right.value.(int)
@@ -94,7 +95,7 @@ func (thisExpr Binary) visitBinaryExpr(inputExpr Binary) (Object, error) {
 			right_value := right.value.(float64)
 			return Object{left_value - right_value, "f64"}, nil
 		}
-	} else if inputExpr.operator.tokenType == SLASH {
+	} else if inputExpr.operator.Type == token.SLASH {
 		if left.internalType == "int" && right.internalType == "int" {
 			left_value := left.value.(int)
 			right_value := right.value.(int)
@@ -105,7 +106,7 @@ func (thisExpr Binary) visitBinaryExpr(inputExpr Binary) (Object, error) {
 			right_value := right.value.(float64)
 			return Object{left_value / right_value, "f64"}, nil
 		}
-	} else if inputExpr.operator.tokenType == STAR {
+	} else if inputExpr.operator.Type == token.STAR {
 		if left.internalType == "int" && right.internalType == "int" {
 			left_value := left.value.(int)
 			right_value := right.value.(int)
@@ -116,7 +117,7 @@ func (thisExpr Binary) visitBinaryExpr(inputExpr Binary) (Object, error) {
 			right_value := right.value.(float64)
 			return Object{left_value * right_value, "f64"}, nil
 		}
-	} else if inputExpr.operator.tokenType == PLUS {
+	} else if inputExpr.operator.Type == token.PLUS {
 		if left.internalType == "int" && right.internalType == "int" {
 			left_value := left.value.(int)
 			right_value := right.value.(int)
@@ -133,7 +134,7 @@ func (thisExpr Binary) visitBinaryExpr(inputExpr Binary) (Object, error) {
 
 func (thisExpr Unary) visitUnaryExpr(inputExpr Unary) (Object, error) {
 	right, _ := evaluate(inputExpr.right)
-	if inputExpr.operator.tokenType == MINUS {
+	if inputExpr.operator.Type == token.MINUS {
 		if right.internalType == "int" {
 			return Object{-right.value.(int), "int"}, nil
 		}

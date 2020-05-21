@@ -1,5 +1,7 @@
 package token
 
+import "fmt"
+
 type TokenType int
 type Pos int
 type Line int
@@ -126,9 +128,15 @@ func reverseMap(m map[string]TokenType) map[TokenType]string {
 var eof = rune(0)
 
 type Token struct {
-	tokenType TokenType
-	value     string
-	pos       Pos
-	end       Pos
-	line      Line
+	Type  TokenType
+	value string
+	pos   Pos
+	end   Pos
+	line  Line
+}
+
+func print(token Token) {
+	tokenTypeReadable, _ := reverseKeys[token.Type]
+	printFormat := "type: %s, value: %s, start: %d, end: %d, line:%d\n"
+	fmt.Printf(printFormat, tokenTypeReadable, token.value, token.pos, token.end, token.line)
 }

@@ -4,6 +4,8 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
+	"github.com/badc0re/hprog/parser"
+	"github.com/badc0re/hprog/token"
 	"os"
 	"strings"
 )
@@ -11,12 +13,6 @@ import (
 func readline(idet string, scanner *bufio.Scanner) bool {
 	fmt.Print(idet)
 	return scanner.Scan()
-}
-
-func wannaPrint(token Token) {
-	tokenTypeReadable, _ := reverseKeys[token.tokenType]
-	printFormat := "type: %s, value: %s, start: %d, end: %d, line:%d\n"
-	fmt.Printf(printFormat, tokenTypeReadable, token.value, token.pos, token.end, token.line)
 }
 
 func main() {
@@ -45,9 +41,9 @@ func main() {
 
 		for {
 			token := lex.nextToken()
-			wannaPrint(token)
+			token.print(token)
 			//fmt.Print(token.value, " ")
-			if token.tokenType == EOF {
+			if token.tokenType == token.EOF {
 				break
 			}
 		}
@@ -69,14 +65,14 @@ func main() {
 				var sline = scanner.Text()
 				if len(sline) > 0 {
 					lex := startGrinding(sline)
-					var tokens []Token
+					var tokens []token.Token
 					for {
 						token := lex.nextToken()
 						tokens = append(tokens, token)
-						if token.tokenType == EOF || token.tokenType == ERR {
+						if token.tokenType == token.EOF || token.tokenType == token.ERR {
 							break
 						}
-						wannaPrint(token)
+						token.print(token)
 					}
 					parser := Parser{tokens: tokens, current: 0}
 					expr, err := parser.expression()
